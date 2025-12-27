@@ -1,0 +1,273 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Candidat;
+use App\Models\Note;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+
+class PdfController extends Controller
+{
+    /**
+     * Générer la convocation d'un candidat en PDF
+     */
+    public function genererConvocation($candidatId)
+    {
+        try {
+            // Récupérer le candidat avec ses relations
+            $candidat = Candidat::with(['ecole', 'serie'])
+                ->findOrFail($candidatId);
+
+            // Vérifier que le candidat a un numéro de table
+            if (empty($candidat->numero_table)) {
+                return response()->json([
+                    'error' => 'Le numéro de table n\'a pas encore été généré pour ce candidat'
+                ], 400);
+            }
+
+            // Données pour la convocation
+            $data = [
+                'candidat' => $candidat,
+                'ecole' => $candidat->ecole,
+                'serie' => $candidat->serie,
+                'date_generation' => now()->format('d/m/Y'),
+            ];
+
+            // Générer le PDF
+            $pdf = Pdf::loadView('pdf.convocation', $data);
+            
+            // Configuration du PDF
+            $pdf->setPaper('a4', 'portrait');
+            
+            // Télécharger le PDF
+            return $pdf->download("convocation_{$candidat->numero_table}.pdf");
+
+        } catch (\Exception $e) {
+            Log::error('Erreur génération convocation: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Erreur lors de la génération de la convocation'
+            ], 500);
+        }
+    }
+
+    /**
+     * Visualiser la convocation avant téléchargement
+     */
+    public function visualiserConvocation($candidatId)
+    {
+        try {
+            $candidat = Candidat::with(['ecole', 'serie'])
+                ->findOrFail($candidatId);
+
+            if (empty($candidat->numero_table)) {
+                return response()->json([
+                    'error' => 'Le numéro de table n\'a pas encore été généré'
+                ], 400);
+            }
+
+            $data = [
+                'candidat' => $candidat,
+                'ecole' => $candidat->ecole,
+                'serie' => $candidat->serie,
+                'date_generation' => now()->format('d/m/Y'),
+            ];
+
+            $pdf = Pdf::loadView('pdf.convocation', $data);
+            $pdf->setPaper('a4', 'portrait');
+            
+            // Afficher dans le navigateur
+            return $pdf->stream("convocation_{$candidat->numero_table}.pdf");
+
+        } catch (\Exception $e) {
+            Log::error('Erreur visualisation convocation: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Erreur lors de la visualisation'
+            ], 500);
+        }
+    }
+
+    /**
+     * Générer le relevé de notes d'un candidat en PDF
+     */
+    public function genererReleve($candidatId)
+    {
+        try {
+            // Récupérer le candidat avec toutes ses notes et matières
+            $candidat = Candidat::with([
+                'ecole',
+                'serie',
+                'notes.matiere'
+            ])->findOrFail($candidatId);
+
+            // Calculer la moyenne générale
+            $notes = $candidat->notes;
+            $totalPoints = 0;
+            $totalCoefficients = 0;
+
+            foreach ($notes as $note) {
+                $coefficient = $note->matiere->coefficient ?? 1;
+                $totalPoints += $note->note * $coefficient;
+                $totalCoefficients += $coefficient;
+            }
+
+            $moyenne = $totalCoefficients > 0 
+                ? round($totalPoints / $totalCoefficients, 2) 
+                : 0;
+
+            // Déterminer la mention
+            $mention = $this->getMention($moyenne);
+
+            // Données pour le relevé
+            $data = [
+                'candidat' => $candidat,
+                'ecole' => $candidat->ecole,
+                'serie' => $candidat->serie,
+                'notes' => $notes,
+                'moyenne' => $moyenne,
+                'mention' => $mention,
+                'date_generation' => now()->format('d/m/Y'),
+            ];
+
+            // Générer le PDF
+            $pdf = Pdf::loadView('pdf.releve', $data);
+            $pdf->setPaper('a4', 'portrait');
+            
+            return $pdf->download("releve_notes_{$candidat->numero_table}.pdf");
+
+        } catch (\Exception $e) {
+            Log::error('Erreur génération relevé: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Erreur lors de la génération du relevé'
+            ], 500);
+        }
+    }
+
+    /**
+     * Visualiser le relevé de notes
+     */
+    public function visualiserReleve($candidatId)
+    {
+        try {
+            $candidat = Candidat::with([
+                'ecole',
+                'serie',
+                'notes.matiere'
+            ])->findOrFail($candidatId);
+
+            $notes = $candidat->notes;
+            $totalPoints = 0;
+            $totalCoefficients = 0;
+
+            foreach ($notes as $note) {
+                $coefficient = $note->matiere->coefficient ?? 1;
+                $totalPoints += $note->note * $coefficient;
+                $totalCoefficients += $coefficient;
+            }
+
+            $moyenne = $totalCoefficients > 0 
+                ? round($totalPoints / $totalCoefficients, 2) 
+                : 0;
+
+            $mention = $this->getMention($moyenne);
+
+            $data = [
+                'candidat' => $candidat,
+                'ecole' => $candidat->ecole,
+                'serie' => $candidat->serie,
+                'notes' => $notes,
+                'moyenne' => $moyenne,
+                'mention' => $mention,
+                'date_generation' => now()->format('d/m/Y'),
+            ];
+
+            $pdf = Pdf::loadView('pdf.releve', $data);
+            $pdf->setPaper('a4', 'portrait');
+            
+            return $pdf->stream("releve_notes_{$candidat->numero_table}.pdf");
+
+        } catch (\Exception $e) {
+            Log::error('Erreur visualisation relevé: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Erreur lors de la visualisation'
+            ], 500);
+        }
+    }
+
+    /**
+     * Générer les convocations en masse pour une école
+     */
+    public function genererConvocationsEnMasse($ecoleId)
+    {
+        try {
+            $candidats = Candidat::where('ecole_id', $ecoleId)
+                ->whereNotNull('numero_table')
+                ->with(['ecole', 'serie'])
+                ->get();
+
+            if ($candidats->isEmpty()) {
+                return response()->json([
+                    'error' => 'Aucun candidat trouvé pour cette école'
+                ], 404);
+            }
+
+            // Créer un ZIP contenant tous les PDFs
+            $zip = new \ZipArchive();
+            $zipFileName = 'convocations_ecole_' . $ecoleId . '_' . time() . '.zip';
+            $zipFilePath = storage_path('app/public/' . $zipFileName);
+
+            if ($zip->open($zipFilePath, \ZipArchive::CREATE) !== TRUE) {
+                return response()->json([
+                    'error' => 'Impossible de créer le fichier ZIP'
+                ], 500);
+            }
+
+            foreach ($candidats as $candidat) {
+                $data = [
+                    'candidat' => $candidat,
+                    'ecole' => $candidat->ecole,
+                    'serie' => $candidat->serie,
+                    'date_generation' => now()->format('d/m/Y'),
+                ];
+
+                $pdf = Pdf::loadView('pdf.convocation', $data);
+                $pdf->setPaper('a4', 'portrait');
+                
+                $pdfContent = $pdf->output();
+                $zip->addFromString(
+                    "convocation_{$candidat->numero_table}.pdf",
+                    $pdfContent
+                );
+            }
+
+            $zip->close();
+
+            return response()->download($zipFilePath)->deleteFileAfterSend(true);
+
+        } catch (\Exception $e) {
+            Log::error('Erreur génération en masse: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Erreur lors de la génération en masse'
+            ], 500);
+        }
+    }
+
+    /**
+     * Déterminer la mention selon la moyenne
+     */
+    private function getMention($moyenne)
+    {
+        if ($moyenne >= 16) {
+            return 'Très Bien';
+        } elseif ($moyenne >= 14) {
+            return 'Bien';
+        } elseif ($moyenne >= 12) {
+            return 'Assez Bien';
+        } elseif ($moyenne >= 10) {
+            return 'Passable';
+        } else {
+            return 'Ajourné';
+        }
+    }
+}

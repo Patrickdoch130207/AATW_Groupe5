@@ -1,0 +1,72 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Candidat;
+use Barryvdh\DomPDF\Facade\Pdf;
+
+class PdfGeneratorService
+{
+    /**
+     * Calculer la moyenne d'un candidat
+     */
+    public function calculerMoyenne(Candidat $candidat)
+    {
+        $notes = $candidat->notes;
+        $totalPoints = 0;
+        $totalCoefficients = 0;
+
+        foreach ($notes as $note) {
+            $coefficient = $note->matiere->coefficient ?? 1;
+            $totalPoints += $note->note * $coefficient;
+            $totalCoefficients += $coefficient;
+        }
+
+        return $totalCoefficients > 0 
+            ? round($totalPoints / $totalCoefficients, 2) 
+            : 0;
+    }
+
+    /**
+     * Déterminer la mention
+     */
+    public function getMention($moyenne)
+    {
+        if ($moyenne >= 16) return 'Très Bien';
+        if ($moyenne >= 14) return 'Bien';
+        if ($moyenne >= 12) return 'Assez Bien';
+        if ($moyenne >= 10) return 'Passable';
+        return 'Ajourné';
+    }
+
+    /**
+     * Préparer les données pour la convocation
+     */
+    public function preparerDonneesConvocation(Candidat $candidat)
+    {
+        return [
+            'candidat' => $candidat,
+            'ecole' => $candidat->ecole,
+            'serie' => $candidat->serie,
+            'date_generation' => now()->format('d/m/Y'),
+        ];
+    }
+
+    /**
+     * Préparer les données pour le relevé
+     */
+    public function preparerDonneesReleve(Candidat $candidat)
+    {
+        $moyenne = $this->calculerMoyenne($candidat);
+        
+        return [
+            'candidat' => $candidat,
+            'ecole' => $candidat->ecole,
+            'serie' => $candidat->serie,
+            'notes' => $candidat->notes,
+            'moyenne' => $moyenne,
+            'mention' => $this->getMention($moyenne),
+            'date_generation' => now()->format('d/m/Y'),
+        ];
+    }
+}

@@ -31,4 +31,20 @@ class Student extends Model
     {
         return $this->belongsTo(School::class);
     }
+    
+    // Relation avec la série
+ 
+    public function serie()
+   {
+      return $this->belongsTo(Serie::class);
+   }
+
+
+   // Relation avec les notes
+ 
+    public function notes()
+   {
+        return $this->hasMany(Note::class);
+   }
+    
 }
