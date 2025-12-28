@@ -68,7 +68,11 @@ function App() {
             )}
 
             {/* --- Espace ÉTUDIANT / CANDIDAT --- */}
+<<<<<<< HEAD:myApp/frontend/client/src/App.jsx
             {user.role === 'etudiant' && (
+=======
+            {user.role === 'student' && (
+>>>>>>> b52ae4f9 (Liaison des pages de connexion et gestion des roles utilisateurs):myApp/frontend/src/App.jsx
               <>
                 <Route path="/candidat/dashboard" element={<CandidatDashboard />} />
               </>

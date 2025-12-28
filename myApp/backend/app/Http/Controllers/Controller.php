@@ -6,9 +6,10 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
 
+
 class Controller extends BaseController
 {
-<<<<<<< HEAD
+
     //
 }
 
@@ -30,7 +31,5 @@ class CandidateController extends Controller
         return back()->with('success', "Candidat créé ! ID: {$result['user']->username} | MDP: {$result['plain_password']}");
     }
 }
-=======
-    use AuthorizesRequests, ValidatesRequests;
-}
->>>>>>> e606a7b (liason ouverture de session et autres)
+
+

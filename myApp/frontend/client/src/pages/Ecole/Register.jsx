@@ -16,7 +16,12 @@ const RegisterEcole = () => {
     ville: '',
     adresse_precise: '',
     email: '',
+<<<<<<< HEAD:myApp/frontend/client/src/pages/Ecole/Register.jsx
     password: ''
+=======
+    password: '',
+    password_confirmation: ''
+>>>>>>> b52ae4f9 (Liaison des pages de connexion et gestion des roles utilisateurs):myApp/frontend/src/pages/Ecole/Register.jsx
   });
 
   const departementsBenin = [
@@ -46,9 +51,15 @@ const RegisterEcole = () => {
     setLoading(true);
     try {
       const payload = {
+<<<<<<< HEAD:myApp/frontend/client/src/pages/Ecole/Register.jsx
         username: formData.email, // Use email as username for now
         email: formData.email,
         password: formData.password,
+=======
+        email: formData.email,
+        password: formData.password,
+        password_confirmation: formData.password_confirmation,
+>>>>>>> b52ae4f9 (Liaison des pages de connexion et gestion des roles utilisateurs):myApp/frontend/src/pages/Ecole/Register.jsx
         school_name: formData.nom_etablissement,
         director_name: formData.nom_directeur,
         decree_number: formData.arrete_ministeriel,
@@ -220,6 +231,21 @@ const RegisterEcole = () => {
             </div>
           </div>
 
+<<<<<<< HEAD:myApp/frontend/client/src/pages/Ecole/Register.jsx
+=======
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700 ml-1">Confirmation du mot de passe</label>
+            <div className="relative group">
+              <input
+                type="password" name="password_confirmation" required
+                value={formData.password_confirmation} onChange={handleChange}
+                className="w-full pl-4 pr-4 py-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-slate-700 transition-all border border-transparent focus:bg-white"
+                placeholder="Min 8 caractères"
+              />
+            </div>
+          </div>
+
+>>>>>>> b52ae4f9 (Liaison des pages de connexion et gestion des roles utilisateurs):myApp/frontend/src/pages/Ecole/Register.jsx
           {/* --- BOUTON D'ENVOI --- */}
           <div className="md:col-span-2 mt-10">
             <button

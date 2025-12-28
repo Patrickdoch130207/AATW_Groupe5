@@ -12,10 +12,16 @@ const Sessions = () => {
   const fetchSessions = async () => {
     try {
       const response = await adminService.getSessions();
+<<<<<<< HEAD:myApp/frontend/client/src/pages/Admin/Sessions.jsx
       setSessions(response.data || []);
     } catch (err) {
       console.error("Failed to fetch sessions", err);
       setSessions([]);
+=======
+      setSessions(response.data);
+    } catch (err) {
+      console.error("Failed to fetch sessions", err);
+>>>>>>> b52ae4f9 (Liaison des pages de connexion et gestion des roles utilisateurs):myApp/frontend/src/pages/Admin/Sessions.jsx
     } finally {
       setLoading(false);
     }
@@ -29,6 +35,7 @@ const Sessions = () => {
     e.preventDefault();
     setSubmitting(true);
     try {
+<<<<<<< HEAD:myApp/frontend/client/src/pages/Admin/Sessions.jsx
       // Basic client-side validation to avoid 422
       if (!newSession.name?.trim()) {
         alert('Le nom de la session est requis.');
@@ -56,17 +63,23 @@ const Sessions = () => {
         return;
       }
 
+=======
+>>>>>>> b52ae4f9 (Liaison des pages de connexion et gestion des roles utilisateurs):myApp/frontend/src/pages/Admin/Sessions.jsx
       await adminService.createSession(newSession);
       setShowModal(false);
       setNewSession({ name: '', start_date: '', end_date: '' });
       fetchSessions();
     } catch (err) {
+<<<<<<< HEAD:myApp/frontend/client/src/pages/Admin/Sessions.jsx
       const errors = err?.response?.data?.errors || err?.response?.data;
       console.error('Validation errors:', errors || err);
       const msg = errors
         ? Object.entries(errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n')
         : (err?.response?.data?.message || 'Erreur lors de la création de la session');
       alert(msg);
+=======
+      alert("Erreur lors de la création de la session");
+>>>>>>> b52ae4f9 (Liaison des pages de connexion et gestion des roles utilisateurs):myApp/frontend/src/pages/Admin/Sessions.jsx
     } finally {
       setSubmitting(false);
     }
@@ -78,7 +91,10 @@ const Sessions = () => {
       await adminService.updateSession(id, { status });
       fetchSessions();
     } catch (err) {
+<<<<<<< HEAD:myApp/frontend/client/src/pages/Admin/Sessions.jsx
       console.error("Erreur lors de la mise à jour", err);
+=======
+>>>>>>> b52ae4f9 (Liaison des pages de connexion et gestion des roles utilisateurs):myApp/frontend/src/pages/Admin/Sessions.jsx
       alert("Erreur lors de la mise à jour");
     }
   };
