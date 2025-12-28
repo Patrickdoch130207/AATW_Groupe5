@@ -18,6 +18,7 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
+<<<<<<< HEAD
         'name',
         'username',
         'email',
@@ -25,6 +26,19 @@ class User extends Authenticatable
         'role',
     ];
 
+=======
+    'name',
+    'email',
+    'password',
+    'is_admin'
+  ];
+  
+  protected $casts = [
+    'email_verified_at' => 'datetime',
+    'password' => 'hashed',
+    'is_admin' => 'boolean',
+];
+>>>>>>> e606a7b (liason ouverture de session et autres)
     /**
      * The attributes that should be hidden for serialization.
      *
@@ -40,11 +54,5 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
-    }
+ 
 }

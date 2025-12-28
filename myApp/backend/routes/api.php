@@ -1,11 +1,14 @@
 <?php
 
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SchoolRegistrationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\StudentController;
+use App\Http\Controllers\Admin\ExamSessionController;
+
 
 
 Route::get('/user', function (Request $request) {
@@ -44,3 +47,12 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         // Voir un étudiant spécifique
         Route::get('/school/search-students/{id}', [StudentController::class, 'show']);
     });
+
+
+
+Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
+    Route::get('sessions', [ExamSessionController::class, 'index']);
+    Route::post('session', [ExamSessionController::class, 'store']);
+    Route::put('session/{examSession}', [ExamSessionController::class, 'updateStatus']);
+});
+

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+<<<<<<< HEAD
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -47,4 +48,52 @@ class Student extends Model
         return $this->hasMany(Note::class);
    }
     
+=======
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class Student extends Model
+{
+    protected $fillable = [
+        'first_name',
+        'last_name',
+        'email',
+        'student_number',
+        'birth_date',
+        'class',
+        'gender',
+        'phone',
+        'address'
+    ];
+
+    protected $casts = [
+        'birth_date' => 'date',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime'
+    ];
+
+    // Relations
+    public function deliberations(): HasMany
+    {
+        return $this->hasMany(Deliberation::class);
+    }
+
+    // Accesseur pour le nom complet
+    public function getFullNameAttribute(): string
+    {
+        return "{$this->first_name} {$this->last_name}";
+    }
+
+    // Vérification du matricule
+    public function isValidStudentNumber(): bool
+    {
+        return preg_match('/^[A-Z0-9]{6,12}$/', $this->student_number);
+    }
+
+    // Calcul de l'âge
+    public function getAgeAttribute(): int
+    {
+        return $this->birth_date->age;
+    }
+>>>>>>> e606a7b (liason ouverture de session et autres)
 }
