@@ -1,24 +1,51 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ClipboardList, CheckSquare, LogOut, User, School, GraduationCap, Users, Edit2 } from 'lucide-react';
+import { Link, Outlet, useNavigate } from "react-router-dom";
+import {
+  LayoutDashboard,
+  ClipboardList,
+  CheckSquare,
+  LogOut,
+  User,
+  School,
+  GraduationCap,
+  Users,
+  Edit2,
+} from "lucide-react";
+import { authService } from "../services/api";
 
 const Layout = ({ userRole }) => {
   const navigate = useNavigate();
-
+  const user = authService.getCurrentUser();
   const menuItems = {
     admin: [
-      { label: 'Tableau de bord', path: '/admin/dashboard', icon: <LayoutDashboard /> },
-      { label: 'Sessions Exams', path: '/admin/sessions', icon: <ClipboardList /> },
-      { label: 'Validation Écoles', path: '/admin/validation', icon: <CheckSquare /> },
-      { label: 'Saisie des Notes', path: '/admin/notes', icon: <Edit2 /> },
+      {
+        label: "Tableau de bord",
+        path: "/admin/dashboard",
+        icon: <LayoutDashboard />,
+      },
+      {
+        label: "Sessions Exams",
+        path: "/admin/sessions",
+        icon: <ClipboardList />,
+      },
+      {
+        label: "Validation Écoles",
+        path: "/admin/validation",
+        icon: <CheckSquare />,
+      },
+      { label: "Délibération", path: "/admin/deliberations", icon: <Edit2 /> },
     ],
     school: [
-      { label: 'Tableau de bord', path: '/ecole/dashboard', icon: <School /> },
-      { label: 'Mes Candidats', path: '/ecole/candidats', icon: <Users /> },
-      { label: 'Inscrire Candidats', path: '/ecole/inscription', icon: <User /> },
+      { label: "Tableau de bord", path: "/ecole/dashboard", icon: <School /> },
+      { label: "Mes Candidats", path: "/ecole/candidats", icon: <Users /> },
+      {
+        label: "Inscrire Candidats",
+        path: "/ecole/inscription",
+        icon: <User />,
+      },
     ],
     etudiant: [
-      { label: 'Mon Espace', path: '/candidat/dashboard', icon: <User /> },
-    ]
+      { label: "Mon Espace", path: "/candidat/dashboard", icon: <User /> },
+    ],
   };
 
   return (
@@ -34,12 +61,18 @@ const Layout = ({ userRole }) => {
               Exam<span className="text-[#1579de]">Flow</span>
             </span>
           </Link>
-          <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 ml-1">République du Bénin</p>
+          <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 ml-1">
+            République du Bénin
+          </p>
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-4">
           {menuItems[userRole]?.map((item) => (
-            <Link key={item.path} to={item.path} className="flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-blue-50 hover:text-[#1579de] rounded-xl transition-all font-medium">
+            <Link
+              key={item.path}
+              to={item.path}
+              className="flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-blue-50 hover:text-[#1579de] rounded-xl transition-all font-medium"
+            >
               {item.icon}
               {item.label}
             </Link>
@@ -47,7 +80,10 @@ const Layout = ({ userRole }) => {
         </nav>
 
         <div className="p-4 border-t border-slate-100">
-          <button onClick={() => navigate('/login')} className="flex items-center gap-3 w-full px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl transition-all font-bold">
+          <button
+            onClick={() => navigate("/login")}
+            className="flex items-center gap-3 w-full px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl transition-all font-bold"
+          >
             <LogOut /> Déconnexion
           </button>
         </div>
@@ -58,11 +94,38 @@ const Layout = ({ userRole }) => {
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-end px-8">
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="text-xs font-bold text-slate-700 capitalize">{userRole}</p>
-              <p className="text-[10px] text-slate-400">Utilisateur connecté</p>
+              <p className="text-xs font-black text-slate-800 uppercase tracking-tight">
+                {/* Pour l'école */}
+                {user?.role === "school" && user?.school?.school_name}
+
+                {/* Pour l'étudiant - Maintenant que le PHP envoie l'objet 'student' */}
+                {user?.role === "student" &&
+                  `${user?.student?.first_name} ${user?.student?.last_name}`}
+
+                {/* Pour l'admin */}
+                {user?.role === "admin" && user?.email}
+              </p>
+
+              <p className="text-[10px] text-slate-400 font-bold uppercase">
+                {user?.role === "school"
+                  ? "Espace École"
+                  : user?.role === "student"
+                  ? `Matricule: ${user?.student?.matricule}`
+                  : "Administration"}
+              </p>
             </div>
-            <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-[#1579de]">
-              <User size={20} />
+
+            <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-[#1579de] border border-blue-100 shadow-sm">
+              {user?.role === "admin" ? (
+                <User size={20} />
+              ) : (
+                <span className="font-black text-sm uppercase">
+                  {/* Initiale dynamique selon le rôle */}
+                  {user?.role === "school"
+                    ? user?.school?.school_name?.[0]
+                    : user?.student?.first_name?.[0]}
+                </span>
+              )}
             </div>
           </div>
         </header>

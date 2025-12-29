@@ -16,11 +16,27 @@ class StudentController extends Controller
         $request->validate([
             'first_name' => 'required|string|max:100',
             'last_name' => 'required|string|max:100',
-            'birth_date' => 'required|date',
-            'class_level' => 'required|string',
+            'birth_date' => 'required|date', 
+            'pob' => 'required|string|max:255', // Lieu de naissance (Frontend)
+            'series' => [
+                'string',
+                'nullable',
+                'in:A1,A2,A3,B,C,D,E,F1,F2,F3,F4,G1,G2,G3',
+                'required_if:class_level,Tle'
+                ], // Série (Frontend)
+            'gender' => 'required|in:M,F', // Genre (Frontend)
+            'class_level'=>'required|in:3e,Tle', // 
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048', // Photo (Frontend)
         ]);
 
         $userSchool = $request->user();
+
+        if ($request->hasFile('photo')) {
+    // Stocke la photo dans storage/app/public/students
+            $path = $request->file('photo')->store('students', 'public');
+            $student->photo = $path;
+            $student->save();
+        }
         
         if ($userSchool->role !== 'school') {
             return response()->json(['message' => 'Action non autorisée'], 403);
@@ -60,6 +76,10 @@ class StudentController extends Controller
                 'matricule' => $matricule,
                 'birth_date' => $request->birth_date,
                 'class_level' => $request->class_level,
+                'pob'         => $request->pob,
+                'class_level' => $request->class_level,
+                'series'      => $request->series,
+                'temp_password' => $autoPassword,
             ]);
 
             DB::commit();
@@ -83,27 +103,6 @@ class StudentController extends Controller
         }
     }
 
-    public function index(Request $request)
-    {
-        // 1. Récupérer l'école de l'utilisateur connecté
-        $school = $request->user()->school;
-
-        if (!$school) {
-            return response()->json(['message' => 'Profil établissement non trouvé.'], 404);
-        }
-
-        // 2. Récupérer les étudiants de cette école avec les infos de compte (email)
-        $students = Student::where('school_id', $school->id)
-                        ->with('user:id,email') // On prend juste l'ID et l'email de la table users
-                        ->latest()
-                        ->get();
-
-        return response()->json([
-            'total' => $students->count(),
-            'students' => $students
-        ]);
-    }
-
 
     public function show(Request $request, $id)
     {
@@ -123,5 +122,146 @@ class StudentController extends Controller
      }
 
         return response()->json($student);
+    }
+
+    public function index(Request $request)
+{
+    // 1. Récupérer l'école liée à l'utilisateur (Admin École) connecté
+    $school = $request->user()->school;
+
+    if (!$school) {
+        return response()->json(['message' => 'Profil établissement non trouvé.'], 404);
+    }
+
+    // 2. Récupérer les étudiants uniquement pour cette école
+    $students = Student::where('school_id', $school->id)
+                    ->with('user:id,email') // Charge l'email du compte login
+                    ->latest()
+                    ->get();
+
+    // 3. Retourner les données (on les enveloppe dans 'students' pour le front)
+    return response()->json([
+        'total' => $students->count(),
+        'students' => $students
+    ]);
+}
+
+public function getStats(Request $request)
+{
+    $user = $request->user();
+    
+    // On récupère l'école via la relation définie dans le modèle User
+    $school = $user->school;
+
+    if (!$school) {
+        return response()->json(['count' => 0], 200);
+    }
+
+    // Compter le nombre d'étudiants ayant le school_id de cette école
+    $count = Student::where('school_id', $school->id)->count();
+
+    return response()->json([
+        'count' => $count
+    ]);
+}
+    /**
+     * Récupère les résultats (délibérations) de l'étudiant connecté
+     */
+    public function getMyResults(Request $request)
+    {
+        $user = $request->user();
+        
+        if ($user->role !== 'student' || !$user->student) {
+            return response()->json(['message' => 'Accès non autorisé'], 403);
+        }
+
+        $student = $user->student;
+        
+        // Récupérer toutes les délibérations de l'étudiant avec les sessions et les notes
+        $deliberations = \App\Models\Deliberation::where('student_id', $student->id)
+            ->with([
+                'examSession:id,name,start_date,end_date,status',
+                'student.subjects' => function ($query) {
+                    $query->select('subjects.id', 'name')
+                          ->withPivot('note', 'coefficient');
+                }
+            ])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $deliberations->map(function ($del) use ($student) {
+                return [
+                    'id' => $del->id,
+                    'session' => $del->examSession ? [
+                        'id' => $del->examSession->id,
+                        'name' => $del->examSession->name,
+                        'start_date' => $del->examSession->start_date,
+                        'end_date' => $del->examSession->end_date,
+                        'status' => $del->examSession->status,
+                    ] : null,
+                    'average' => $del->average,
+                    'decision' => $del->decision,
+                    'is_validated' => $del->is_validated,
+                    'remarks' => $del->remarks,
+                    'subjects' => $student->subjects->map(function ($subject) {
+                        return [
+                            'id' => $subject->id,
+                            'name' => $subject->name,
+                            'coef' => (float) ($subject->pivot->coefficient ?? 1.0),
+                            'note' => $subject->pivot->note !== null ? (float) $subject->pivot->note : null,
+                        ];
+                    }),
+                ];
+            }),
+        ]);
+    }
+
+    /**
+     * Récupère la convocation de l'étudiant pour une session
+     */
+    public function getMyConvocation(Request $request, $sessionId)
+    {
+        $user = $request->user();
+        
+        if ($user->role !== 'student' || !$user->student) {
+            return response()->json(['message' => 'Accès non autorisé'], 403);
+        }
+
+        $student = $user->student;
+        
+        // Vérifier que l'étudiant est bien inscrit à cette session
+        if ($student->exam_session_id != $sessionId) {
+            return response()->json(['message' => 'Vous n\'êtes pas inscrit à cette session'], 404);
+        }
+
+        $session = \App\Models\ExamSession::findOrFail($sessionId);
+        
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'student' => [
+                    'id' => $student->id,
+                    'first_name' => $student->first_name,
+                    'last_name' => $student->last_name,
+                    'matricule' => $student->matricule,
+                    'birth_date' => $student->birth_date,
+                    'class_level' => $student->class_level,
+                    'school' => $student->school ? [
+                        'id' => $student->school->id,
+                        'name' => $student->school->name,
+                        'establishment_code' => $student->school->establishment_code,
+                    ] : null,
+                ],
+                'session' => [
+                    'id' => $session->id,
+                    'name' => $session->name,
+                    'start_date' => $session->start_date,
+                    'end_date' => $session->end_date,
+                    'status' => $session->status,
+                ],
+            ],
+        ]);
     }
 }

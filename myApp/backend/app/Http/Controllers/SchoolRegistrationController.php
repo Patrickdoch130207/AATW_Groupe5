@@ -3,75 +3,65 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Models\School; // Ne pas oublier d'importer le modèle School
+use App\Models\School; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\DB;     // Indispensable pour DB::beginTransaction()
+use Illuminate\Support\Facades\DB;     
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class SchoolRegistrationController extends Controller
 {
-    public function register(Request $request)
-    {
-        // 1. VALIDATION
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8|confirmed',
-            'establishment_code' => 'required|string|unique:schools,establishment_code',
-            'address' => 'required|string',
-            'phone' => 'required|string',
-            'contact_email' => 'required|email',
-            'justificatif' => 'nullable|file|mimes:pdf,jpg,png|max:2048',
+    public function registerSchool(Request $request)
+{
+    // 1. Validation rigoureuse
+    $validator = Validator::make($request->all(), [
+        'email'         => 'required|email|unique:users,email',
+        'password'      => 'required|min:8|confirmed',
+        'school_name'   => 'required|string|max:255',
+        'director_name' => 'required|string|max:255',
+        'decree_number' => 'required|string|unique:schools,decree_number',
+        'department'    => 'required|string',
+        'city'          => 'required|string',
+        'address'       => 'required|string',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json(['message' => 'Données invalides', 'errors' => $validator->errors()], 422);
+    }
+
+    DB::beginTransaction();
+    try {
+        // 2. Création du User (identifiants)
+        $user = User::create([
+            'email'    => $request->email,
+            'password' => Hash::make($request->password),
+            'role'     => 'school',
+            
         ]);
 
-        // 2. GESTION DU FICHIER
-        $path = null;
-        if ($request->hasFile('justificatif')) {
-            $path = $request->file('justificatif')->store('justificatifs', 'public');
-        }
+        // 3. Création du Profil School
+        School::create([
+            'user_id'       => $user->id,
+            'school_name'          => $request->school_name,
+            'director_name' => $request->director_name,
+            'decree_number' => $request->decree_number,
+            'department'    => $request->department,
+            'city'          => $request->city,
+            'address'       => $request->address,
+            'status'   => 'pending', // L'école doit être validée par l'admin
+        ]);
 
-        // 3. TRANSACTION
-        DB::beginTransaction();
+        DB::commit();
 
-        try {
-            // Création de l'utilisateur (Compte de connexion)
-            $user = User::create([
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-                'role' => 'school', 
-            ]);
+        return response()->json([
+            'success' => true, 
+            'message' => "Demande d'agrément envoyée avec succès !"
+        ], 201);
 
-            // Création du profil de l'école (Détails métiers)
-            School::create([
-                'user_id' => $user->id,
-                'name' => $request->name,
-                'establishment_code' => $request->establishment_code,
-                'address' => $request->address,
-                'phone' => $request->phone,
-                'contact_email' => $request->contact_email,
-                'justification_path' => $path, // On enregistre le chemin du fichier ici
-                'status' => 'pending',
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Inscription réussie, votre établissement est en attente de validation.'
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            
-            // Si le fichier a été uploadé mais que la DB a échoué, on le supprime pour ne pas encombrer le serveur
-            if ($path) {
-                Storage::disk('public')->delete($path);
-            }
-
-            return response()->json([
-                'message' => 'Erreur lors de l\'inscription.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return response()->json(['message' =>$e->getMessage()] , 500);
     }
+}
 }

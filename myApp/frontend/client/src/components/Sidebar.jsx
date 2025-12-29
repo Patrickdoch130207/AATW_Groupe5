@@ -20,6 +20,7 @@ const Sidebar = ({ userRole }) => {
       { label: 'Tableau de Bord', path: '/admin/dashboard', icon: <LayoutDashboard size={22} /> },
       { label: 'Validation Écoles', path: '/admin/validation', icon: <CheckSquare size={22} /> },
       { label: 'Sessions Exams', path: '/admin/sessions', icon: <ClipboardList size={22} /> },
+      { label: 'Délibérations', path: '/admin/deliberations', icon: <GraduationCap size={22} /> },
     ],
     ecole: [
       { label: 'Ma Structure', path: '/ecole/dashboard', icon: <School size={22} /> },

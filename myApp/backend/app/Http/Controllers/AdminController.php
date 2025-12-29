@@ -45,4 +45,34 @@ class AdminController extends Controller
             'message' => "L'inscription de {$school->name} a été rejetée."
         ]);
     }
+
+    public function getActiveSchools()
+    {
+        // On récupère les établissements dont le statut est "active"
+        // avec les informations de l'utilisateur associé (email, etc.)
+        $activeSchools = School::where('status', 'active')
+                                ->with('user')
+                                ->get();
+
+        return response()->json($activeSchools);
+    }
+
+    public function getStats()
+{
+    // On compte uniquement les écoles validées pour le premier badge
+    $activeSchools = \App\Models\School::where('status', 'active')->count();
+    
+    // On compte tous les candidats inscrits dans la table students
+    $totalCandidates = \App\Models\Student::count();
+
+    // On peut aussi compter les sessions si vous avez une table dédiée
+    $activeSessions = 1; 
+
+    return response()->json([
+        'schools_count' => $activeSchools,
+        'candidates_count' => $totalCandidates,
+        'active_session_count' => $activeSessions,
+        'active_session_name' => "Session Décembre 2025"
+    ]);
+}
 }

@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-<<<<<<< HEAD
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Student extends Model
 {
@@ -14,12 +14,24 @@ class Student extends Model
     protected $fillable = [
         'user_id',
         'school_id',
+        'exam_session_id',
         'first_name',
         'last_name',
         'matricule',
         'birth_date',
         'class_level',
+        'pob',
+        'gender',
+        'series', 
+        'photo',
+        'temp_password',
     ];
+
+    // Lien vers la session d'examen
+    public function examSession(): BelongsTo
+    {
+        return $this->belongsTo(ExamSession::class, 'exam_session_id');
+    }
 
     // Lien vers son compte utilisateur (pour se connecter plus tard)
     public function user(): BelongsTo
@@ -48,23 +60,7 @@ class Student extends Model
         return $this->hasMany(Note::class);
    }
     
-=======
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Student extends Model
-{
-    protected $fillable = [
-        'first_name',
-        'last_name',
-        'email',
-        'student_number',
-        'birth_date',
-        'class',
-        'gender',
-        'phone',
-        'address'
-    ];
 
     protected $casts = [
         'birth_date' => 'date',
@@ -76,6 +72,14 @@ class Student extends Model
     public function deliberations(): HasMany
     {
         return $this->hasMany(Deliberation::class);
+    }
+
+    // Relation avec les matières
+    public function subjects()
+    {
+        return $this->belongsToMany(Subject::class, 'student_subject')
+                    ->withPivot('note', 'coefficient')
+                    ->withTimestamps();
     }
 
     // Accesseur pour le nom complet
@@ -95,5 +99,4 @@ class Student extends Model
     {
         return $this->birth_date->age;
     }
->>>>>>> e606a7b (liason ouverture de session et autres)
 }

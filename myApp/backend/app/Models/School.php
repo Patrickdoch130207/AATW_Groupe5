@@ -12,14 +12,8 @@ class School extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
-        'name',
-        'establishment_code',
-        'address',
-        'phone',
-        'contact_email',
-        'justification_path',
-        'status',
+        'user_id', 'school_name', 'director_name', 'decree_number', 
+    'department', 'city', 'address', 'status'
     ];
 
     // Lien vers le compte utilisateur (Authentification)

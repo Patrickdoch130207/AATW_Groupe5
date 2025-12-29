@@ -13,21 +13,20 @@ return new class extends Migration
     {
         Schema::create('schools', function (Blueprint $table) {
     $table->id();
-    $table->foreignId('user_id')->constrained()->onDelete('cascade'); // Lien vers Users
-    
-    $table->string('name');
-    $table->string('establishment_code')->unique();
-    $table->string('address');
-    $table->string('phone');
-    $table->string('contact_email');
-    $table->string('justification_path')->nullable();
-    $table->enum('status', ['pending', 'active', 'rejected'])->default('pending');
+    $table->foreignId('user_id')->constrained()->onDelete('cascade');
+    $table->string('school_name');             // school_name
+    $table->string('director_name');    // director_name
+    $table->string('decree_number')->unique(); // arrete_ministeriel
+    $table->string('department');       // departement
+    $table->string('city');             // ville
+    $table->text('address');            // adresse_precise
+    $table->string('status')->default('pending'); 
     $table->timestamps();
 });
     }
 
     /**
-     * Reverse the migrations.
+     * Reverse the migrations. 
      */
     public function down(): void
     {

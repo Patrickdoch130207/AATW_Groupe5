@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
 import { User, FileText, Download, Calendar, MapPin, Clock } from 'lucide-react';
-import { authService, candidateService } from '../../services/api';
+import { authService, studentService } from '../../services/api';
 
 const CandidatDashboard = () => {
     const [user] = useState(authService.getCurrentUser());
-    const [data, setData] = useState(null);
+    const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const res = await candidateService.getTranscript(user.id);
-                setData(res.data);
+                const res = await studentService.getMyResults();
+                if (res.success && res.data && res.data.length > 0) {
+                    setResult(res.data[0]); // Prend le résultat le plus récent
+                }
             } catch (err) {
                 console.error("Failed to fetch candidate results", err);
             } finally {
@@ -28,36 +30,49 @@ const CandidatDashboard = () => {
         </div>
     );
 
-    if (!data) return <div className="p-10 text-center text-red-500">Données introuvables.</div>;
+    // Si pas de résultats, afficher un message d'accueil simple
+    if (!result) return (
+        <div className="max-w-6xl mx-auto p-6 md:p-10">
+            <div className="bg-white rounded-[40px] p-10 shadow-sm border border-slate-100 text-center">
+                <h1 className="text-3xl font-black text-slate-800 mb-4">Bienvenue, {user.first_name} !</h1>
+                <p className="text-slate-500 mb-8">Vos résultats d'examen ne sont pas encore disponibles.</p>
+                <div className="inline-flex items-center gap-2 px-6 py-3 bg-blue-50 text-blue-600 rounded-full font-bold text-sm">
+                    <Clock size={18} />
+                    En attente de délibération
+                </div>
+            </div>
+        </div>
+    );
 
-    const { candidate, status, average, mention } = data;
+    // Adaptation des données pour l'affichage
+    const candidate = user; // Utilise les infos de l'utilisateur connecté
+    const status = result.decision;
+    const average = result.average;
+    const mention = average >= 16 ? 'TRÈS BIEN' : average >= 14 ? 'BIEN' : average >= 12 ? 'ASSEZ BIEN' : average >= 10 ? 'PASSABLE' : '---';
+    const sessionName = result.session?.name || '---';
 
     const getStatusStyle = (s) => {
-        if (s === 'ADMIS') return 'bg-green-100 text-green-700 border-green-200';
-        if (s === 'REFUSÉ') return 'bg-red-100 text-red-700 border-red-200';
-        if (s === 'AJOURNÉ') return 'bg-slate-100 text-slate-500 border-slate-200';
+        const decision = s?.toUpperCase();
+        if (decision === 'ADMIS') return 'bg-green-100 text-green-700 border-green-200';
+        if (decision === 'REFUSÉ') return 'bg-red-100 text-red-700 border-red-200';
+        if (decision === 'AJOURNÉ') return 'bg-slate-100 text-slate-500 border-slate-200';
         return 'bg-slate-50 text-slate-400';
     };
 
     const getStatusLabel = (s) => {
-        if (s === 'ADMIS') return 'ADMISSIBLE';
-        return s;
+        return s?.toUpperCase() || 'EN ATTENTE';
     };
 
     return (
-        <div className="max-w-6xl mx-auto p-6">
+        <div className="max-w-6xl mx-auto p-6 md:p-10">
             {/* Header Profile */}
             <div className="bg-white rounded-[40px] p-8 shadow-sm border border-slate-100 flex flex-col md:flex-row items-center gap-10 mb-10 overflow-hidden relative">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 opacity-50"></div>
 
                 <div className="w-40 h-40 bg-slate-50 rounded-[40px] flex items-center justify-center shadow-inner overflow-hidden border-4 border-white shadow-slate-200/50">
-                    {candidate.photo_url ? (
-                        <img src={candidate.photo_url.startsWith('http') ? candidate.photo_url : `http://localhost:8000/${candidate.photo_url}`} alt="Candidat" className="w-full h-full object-cover" />
-                    ) : (
-                        <span className="text-5xl font-black text-slate-300 uppercase letter-spacing-widest">
-                            {candidate.first_name?.[0]}{candidate.last_name?.[0]}
-                        </span>
-                    )}
+                    <span className="text-5xl font-black text-slate-300 uppercase letter-spacing-widest">
+                        {candidate.first_name?.[0]}{candidate.last_name?.[0]}
+                    </span>
                 </div>
 
 
@@ -73,10 +88,10 @@ const CandidatDashboard = () => {
 
                     <div className="flex flex-wrap justify-center md:justify-start gap-4 text-xs font-black text-slate-400 uppercase tracking-widest">
                         <span className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
-                            Matricule: <span className="text-slate-800">{candidate.matricule}</span>
+                            Matricule: <span className="text-slate-800">{candidate.matricule || '---'}</span>
                         </span>
                         <span className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
-                            Table: <span className="text-[#1579de]">{candidate.table_number || '---'}</span>
+                            Session: <span className="text-[#1579de]">{sessionName}</span>
                         </span>
                     </div>
                 </div>
@@ -98,8 +113,7 @@ const CandidatDashboard = () => {
                         <thead>
                             <tr className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
                                 <th className="p-6 text-left">Établissement</th>
-                                <th className="p-6 text-left">Centre</th>
-                                <th className="p-6 text-center">Série</th>
+                                <th className="p-6 text-left">Session</th>
                                 <th className="p-6 text-center">Moyenne</th>
                                 <th className="p-6 text-center">Mention</th>
                                 <th className="p-6 text-right">Décision</th>
@@ -107,13 +121,10 @@ const CandidatDashboard = () => {
                         </thead>
                         <tbody className="text-sm font-bold text-slate-600">
                             <tr>
-                                <td className="p-6 text-left max-w-xs">{candidate.school_name}</td>
-                                <td className="p-6 text-left">{candidate.center_name || 'Non assigné'}</td>
+                                <td className="p-6 text-left max-w-xs">{candidate.school_name || user.school_name || '---'}</td>
+                                <td className="p-6 text-left">{sessionName}</td>
                                 <td className="p-6 text-center">
-                                    <span className="px-3 py-1 bg-slate-100 rounded-lg text-xs uppercase">{candidate.series_name}</span>
-                                </td>
-                                <td className="p-6 text-center">
-                                    <span className="text-xl font-black text-slate-800">{average}</span>
+                                    <span className="text-xl font-black text-slate-800">{Number(average).toFixed(2)}</span>
                                     <span className="text-[10px] text-slate-400 ml-1">/20</span>
                                 </td>
                                 <td className="p-6 text-center">
@@ -141,8 +152,23 @@ const CandidatDashboard = () => {
                     </h2>
 
                     <div className="space-y-4">
+                        {/* Convocation Button */}
                         <button
-                            onClick={() => window.open(`/print/convocation/${user.id}`, '_blank')}
+                            onClick={async () => {
+                                try {
+                                    const blob = await studentService.downloadConvocation(result.session?.id);
+                                    const url = window.URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.setAttribute('download', `convocation_${candidate.matricule}.pdf`);
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    link.remove();
+                                } catch (e) {
+                                    console.error("Erreur téléchargement convocation", e);
+                                    alert("Erreur lors du téléchargement de la convocation.");
+                                }
+                            }}
                             className="w-full p-6 flex items-center justify-between bg-slate-50 hover:bg-slate-100 rounded-[24px] group transition-all border border-transparent hover:border-blue-100"
                         >
                             <div className="flex items-center gap-6">
@@ -151,24 +177,39 @@ const CandidatDashboard = () => {
                                 </div>
                                 <div className="text-left">
                                     <p className="font-black text-slate-800 uppercase text-xs tracking-wider">Convocation</p>
-                                    <p className="text-xs text-slate-400 font-bold">Session {candidate.session_name}</p>
+                                    <p className="text-xs text-slate-400 font-bold">Session {sessionName}</p>
                                 </div>
                             </div>
                             <ChevronRight size={20} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
                         </button>
 
+                        {/* Relevé Button */}
                         <button
-                            disabled={status === '---'}
-                            onClick={() => window.open(`/print/transcript/${user.id}`, '_blank')}
-                            className={`w-full p-6 flex items-center justify-between rounded-[24px] group transition-all border ${status === '---' ? 'bg-slate-50/50 opacity-50 cursor-not-allowed' : 'bg-slate-50 hover:bg-slate-100 border-transparent hover:border-green-100'}`}
+                            disabled={!result.is_validated}
+                            onClick={async () => {
+                                try {
+                                    const blob = await studentService.downloadTranscript(result.session?.id);
+                                    const url = window.URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.setAttribute('download', `releve_notes_${candidate.matricule}.pdf`);
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    link.remove();
+                                } catch (e) {
+                                    console.error("Erreur téléchargement relevé", e);
+                                    alert("Erreur lors du téléchargement du relevé de notes.");
+                                }
+                            }}
+                            className={`w-full p-6 flex items-center justify-between rounded-[24px] group transition-all border ${!result.is_validated ? 'bg-slate-50/50 opacity-50 cursor-not-allowed' : 'bg-slate-50 hover:bg-slate-100 border-transparent hover:border-green-100'}`}
                         >
                             <div className="flex items-center gap-6">
-                                <div className={`w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm transition-all group-hover:scale-110 ${status === '---' ? 'text-slate-200' : 'text-slate-300 group-hover:text-[#2ecc71]'}`}>
+                                <div className={`w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm transition-all group-hover:scale-110 ${!result.is_validated ? 'text-slate-200' : 'text-slate-300 group-hover:text-[#2ecc71]'}`}>
                                     <FileText size={24} />
                                 </div>
                                 <div className="text-left">
                                     <p className="font-black text-slate-800 uppercase text-xs tracking-wider">Relevé de Notes</p>
-                                    <p className="text-xs text-slate-400 font-bold">{status === '---' ? 'Bientôt disponible' : 'Prêt pour impression'}</p>
+                                    <p className="text-xs text-slate-400 font-bold">{!result.is_validated ? 'Pas encore disponible' : 'Disponible'}</p>
                                 </div>
                             </div>
                             <ChevronRight size={20} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
@@ -184,13 +225,13 @@ const CandidatDashboard = () => {
                         <li className="flex gap-4">
                             <div className="shrink-0 w-6 h-6 bg-white/20 rounded-lg flex items-center justify-center text-xs font-bold">1</div>
                             <p className="text-sm font-medium leading-relaxed opacity-90">
-                                Présentez-vous au centre <span className="font-black underline">{candidate.center_name}</span> 30 minutes avant le début des épreuves.
+                                Pour toute réclamation, veuillez contacter votre établissement d'origine : <span className="font-black underline">{candidate.school_name || user.school_name || 'Non spécifié'}</span>.
                             </p>
                         </li>
                         <li className="flex gap-4">
                             <div className="shrink-0 w-6 h-6 bg-white/20 rounded-lg flex items-center justify-center text-xs font-bold">2</div>
                             <p className="text-sm font-medium leading-relaxed opacity-90">
-                                Les résultats affichés ci-dessus sont authentifiés par l'Office du Baccalauréat.
+                                Les résultats affichés ci-dessus sont authentifiés par l'administration.
                             </p>
                         </li>
                     </ul>

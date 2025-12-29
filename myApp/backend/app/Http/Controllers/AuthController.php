@@ -10,56 +10,57 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     public function login(Request $request)
-    {
-        // 1. Validation des champs
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
+{
+    $request->validate([
+        'email' => 'required|email',
+        'password' => 'required',
+    ]);
 
-        // 2. Chercher l'utilisateur par son email
-        $user = User::where('email', $request->email)->with(['school', 'student'])->first();
+    // On charge déjà les relations ici
+    $user = User::where('email', $request->email)->with(['school', 'student'])->first();
 
-        // 3. Vérifier si l'utilisateur existe et si le mot de passe est correct
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['Les identifiants fournis sont incorrects.'],
-            ]);
-        }
-
-        // 4. Vérifier si l'école est validée (Si c'est une école)
-        if ($user->role === 'school' && $user->school->status !== 'active') {
-            return response()->json([
-                'message' => 'Votre compte est en attente de validation par un administrateur.'
-            ], 403);
-        }
-
-        // 5. Créer le Token Sanctum
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        $userData = [
-            'id' => $user->id,
-            'email' => $user->email,
-            'role' => $user->role,
-        ];
-
-        // On ajoute les infos selon le rôle
-        if ($user->role === 'school') {
-            $userData['name'] = $user->school->name;
-        } elseif ($user->role === 'student') {
-            $userData['first_name'] = $user->student->first_name;
-            $userData['last_name'] = $user->student->last_name;
-            $userData['matricule'] = $user->student->matricule;
-        }   
-
-
-        return response()->json([
-            'message' => 'Connexion réussie',
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => $userData
+    if (!$user || !Hash::check($request->password, $user->password)) {
+        throw ValidationException::withMessages([
+            'email' => ['Les identifiants fournis sont incorrects.'],
         ]);
     }
+
+    if ($user->role === 'school' && $user->school->status !== 'active') {
+        return response()->json([
+            'message' => 'Votre compte est en attente de validation par un administrateur.'
+        ], 403);
+    }
+
+    $token = $user->createToken('auth_token')->plainTextToken;
+
+    // Construction de l'objet utilisateur structuré pour le Frontend
+    $userData = [
+        'id' => $user->id,
+        'email' => $user->email,
+        'role' => $user->role,
+    ];
+
+    // On imbrique les objets pour correspondre à la logique user?.school?.name
+    if ($user->role === 'school') {
+        $userData['school'] = [
+            'school_name' => $user->school->school_name,
+            'id' => $user->school->id
+        ];
+    } elseif ($user->role === 'student') {
+        $userData['student'] = [
+            'first_name' => $user->student->first_name,
+            'last_name' => $user->student->last_name,
+            'matricule' => $user->student->matricule
+        ];
+    }
+
+    return response()->json([
+        'message' => 'Connexion réussie',
+        'access_token' => $token,
+        'token_type' => 'Bearer',
+        'user' => $userData
+    ]);
+}
 
     public function logout(Request $request)
     {
