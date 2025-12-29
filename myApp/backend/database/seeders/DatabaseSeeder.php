@@ -15,18 +15,29 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
+        // Créer un utilisateur de test
+        User::create([
             'name' => 'Test User',
+            'username' => 'testuser',
             'email' => 'test@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
         ]);
 
-        // Créer un utilisateur admin
-        User::factory()->create([
+        // Créer un administrateur
+        User::create([
             'name' => 'Admin User',
+            'username' => 'admin',
             'email' => 'admin@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
             'is_admin' => true,
+        ]);
+
+        // Appeler les seeders nécessaires
+        $this->call([
+            SubjectsTableSeeder::class,
+            // Ajoutez d'autres seeders ici si nécessaire
         ]);
     }
 }

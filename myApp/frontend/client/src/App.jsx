@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 
@@ -12,7 +13,7 @@ import NotFound from './pages/NotFound';
 import AdminDashboard from './pages/Admin/Dashboard';
 import Sessions from './pages/Admin/Sessions';
 import ValidationEcoles from './pages/Admin/ValidationEcoles';
-import SaisieNotes from './pages/Admin/SaisieNotes';
+import Deliberation from './pages/Admin/Deliberation';
 
 // --- PAGES PRIVÉES (Ecole) ---
 import EcoleDashboard from './pages/Ecole/Dashboard';
@@ -21,13 +22,30 @@ import MesCandidats from './pages/Ecole/MesCandidats';
 
 // --- PAGES PRIVÉES (Etudiant) ---
 import CandidatDashboard from './pages/Candidat/Dashboard';
+import Resultats from './pages/Etudiant/Resultats';
+import MaConvocation from './pages/Etudiant/MaConvocation';
 
 import { authService } from './services/api';
 
 function App() {
-  // --- ÉTAT D'AUTHENTIFICATION ---
-  const storedUser = authService.getCurrentUser();
-  const user = storedUser ? { loggedIn: true, ...storedUser } : { loggedIn: false };
+  const computeUser = () => {
+    const storedUser = authService.getCurrentUser();
+    return storedUser ? { loggedIn: true, ...storedUser } : { loggedIn: false };
+  };
+
+  const [user, setUser] = useState(computeUser);
+
+  useEffect(() => {
+    const syncUser = () => setUser(computeUser());
+
+    window.addEventListener('storage', syncUser);
+    window.addEventListener('auth-changed', syncUser);
+
+    return () => {
+      window.removeEventListener('storage', syncUser);
+      window.removeEventListener('auth-changed', syncUser);
+    };
+  }, []);
 
   return (
     <Router>
@@ -38,8 +56,10 @@ function App() {
         <Route path="/register-ecole" element={<RegisterEcole />} />
 
         {/* Routes d'Impression */}
-        <Route path="/print/transcript/:id" element={<PrintLayout type="transcript" />} />
-        <Route path="/print/convocation/:id" element={<PrintLayout type="convocation" />} />
+        <Route path="/print/transcript/:sessionId" element={<PrintLayout type="transcript" />} />
+        <Route path="/print/convocation/:sessionId" element={<PrintLayout type="convocation" />} />
+        <Route path="/print/admin/transcript/:studentId/:sessionId" element={<PrintLayout type="transcript" isAdmin />} />
+        <Route path="/print/admin/convocation/:studentId/:sessionId" element={<PrintLayout type="convocation" isAdmin />} />
 
         {/* ==========================================================
             ROUTES PRIVÉES (Nécessitent d'être connecté)
@@ -53,8 +73,8 @@ function App() {
               <>
                 <Route path="/admin/dashboard" element={<AdminDashboard />} />
                 <Route path="/admin/sessions" element={<Sessions />} />
+                <Route path="/admin/deliberations" element={<Deliberation />} />
                 <Route path="/admin/validation" element={<ValidationEcoles />} />
-                <Route path="/admin/notes" element={<SaisieNotes />} />
               </>
             )}
 
@@ -68,13 +88,11 @@ function App() {
             )}
 
             {/* --- Espace ÉTUDIANT / CANDIDAT --- */}
-<<<<<<< HEAD:myApp/frontend/client/src/App.jsx
-            {user.role === 'etudiant' && (
-=======
-            {user.role === 'student' && (
->>>>>>> b52ae4f9 (Liaison des pages de connexion et gestion des roles utilisateurs):myApp/frontend/src/App.jsx
+            {(user.role === 'etudiant' || user.role === 'student') && (
               <>
                 <Route path="/candidat/dashboard" element={<CandidatDashboard />} />
+                <Route path="/etudiant/resultats" element={<Resultats />} />
+                <Route path="/etudiant/convocation/:sessionId" element={<MaConvocation />} />
               </>
             )}
 

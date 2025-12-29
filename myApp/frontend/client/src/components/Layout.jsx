@@ -9,7 +9,7 @@ const Layout = ({ userRole }) => {
       { label: 'Tableau de bord', path: '/admin/dashboard', icon: <LayoutDashboard /> },
       { label: 'Sessions Exams', path: '/admin/sessions', icon: <ClipboardList /> },
       { label: 'Validation Écoles', path: '/admin/validation', icon: <CheckSquare /> },
-      { label: 'Saisie des Notes', path: '/admin/notes', icon: <Edit2 /> },
+      { label: 'Délibération', path: '/admin/deliberations', icon: <Edit2 /> },
     ],
     school: [
       { label: 'Tableau de bord', path: '/ecole/dashboard', icon: <School /> },

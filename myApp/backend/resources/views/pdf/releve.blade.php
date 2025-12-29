@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relevé de Notes - {{ $candidat->numero_table }}</title>
+    <title>Relevé de Notes - {{ $student->matricule }}</title>
     <style>
         * {
             margin: 0;
@@ -15,39 +15,38 @@
             font-family: 'DejaVu Sans', Arial, sans-serif;
             font-size: 11pt;
             line-height: 1.5;
-            padding: 30px;
             color: #333;
+            padding: 30px;
         }
         
         .header {
             text-align: center;
             margin-bottom: 30px;
-            border-bottom: 3px solid #27ae60;
+            border-bottom: 3px solid #28a745;
             padding-bottom: 15px;
         }
         
         .header h1 {
-            color: #27ae60;
-            font-size: 22pt;
+            color: #28a745;
+            font-size: 24pt;
             margin-bottom: 8px;
-            text-transform: uppercase;
         }
         
         .header p {
-            color: #7f8c8d;
+            color: #666;
             font-size: 10pt;
         }
         
-        .info-candidat {
-            background-color: #ecf0f1;
+        .student-info {
+            background-color: #f8f9fa;
+            border-left: 4px solid #28a745;
             padding: 15px;
             margin: 20px 0;
-            border-radius: 5px;
         }
         
-        .info-candidat h2 {
-            color: #2c3e50;
-            font-size: 13pt;
+        .student-info h2 {
+            color: #28a745;
+            font-size: 14pt;
             margin-bottom: 10px;
         }
         
@@ -58,44 +57,48 @@
         }
         
         .info-item {
-            display: flex;
+            padding: 5px 0;
         }
         
-        .info-item strong {
-            min-width: 140px;
-            color: #34495e;
+        .info-label {
+            font-weight: bold;
+            color: #555;
+            font-size: 10pt;
         }
         
-        .notes-table {
+        .info-value {
+            color: #000;
+            font-size: 10pt;
+        }
+        
+        .grades-table {
             width: 100%;
             border-collapse: collapse;
             margin: 25px 0;
         }
         
-        .notes-table thead {
-            background-color: #27ae60;
+        .grades-table thead {
+            background-color: #28a745;
             color: white;
         }
         
-        .notes-table th {
-            padding: 12px;
+        .grades-table th {
+            padding: 12px 8px;
             text-align: left;
             font-size: 11pt;
-            border: 1px solid #27ae60;
         }
         
-        .notes-table td {
-            padding: 10px;
-            border: 1px solid #ddd;
-            font-size: 10pt;
+        .grades-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #dee2e6;
         }
         
-        .notes-table tbody tr:nth-child(even) {
+        .grades-table tbody tr:hover {
             background-color: #f8f9fa;
         }
         
-        .notes-table tbody tr:hover {
-            background-color: #e8f5e9;
+        .grades-table tbody tr:nth-child(even) {
+            background-color: #f9f9f9;
         }
         
         .text-center {
@@ -106,192 +109,227 @@
             text-align: right;
         }
         
-        .resultat {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+        .summary-box {
+            background-color: #e7f3ff;
+            border: 2px solid #28a745;
             padding: 20px;
-            margin: 30px 0;
-            border-radius: 8px;
-            text-align: center;
-        }
-        
-        .resultat h2 {
-            font-size: 16pt;
-            margin-bottom: 15px;
-        }
-        
-        .resultat .moyenne {
-            font-size: 32pt;
-            font-weight: bold;
-            margin: 10px 0;
-        }
-        
-        .resultat .mention {
-            font-size: 18pt;
-            font-weight: bold;
-            margin-top: 10px;
-            padding: 10px;
-            background-color: rgba(255, 255, 255, 0.2);
+            margin: 25px 0;
             border-radius: 5px;
         }
         
-        .mention-tb { background-color: #27ae60 !important; }
-        .mention-b { background-color: #3498db !important; }
-        .mention-ab { background-color: #f39c12 !important; }
-        .mention-p { background-color: #95a5a6 !important; }
-        .mention-aj { background-color: #e74c3c !important; }
+        .summary-box h3 {
+            color: #28a745;
+            font-size: 14pt;
+            margin-bottom: 15px;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            text-align: center;
+        }
+        
+        .summary-item {
+            padding: 15px;
+            background-color: white;
+            border-radius: 5px;
+        }
+        
+        .summary-label {
+            font-size: 10pt;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .summary-value {
+            font-size: 20pt;
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .decision-admis {
+            color: #28a745;
+        }
+        
+        .decision-ajourne {
+            color: #ffc107;
+        }
+        
+        .decision-exclu {
+            color: #dc3545;
+        }
         
         .footer {
             margin-top: 40px;
             text-align: center;
-            padding-top: 15px;
-            border-top: 2px solid #ecf0f1;
             font-size: 9pt;
-            color: #7f8c8d;
+            color: #666;
+            border-top: 1px solid #ddd;
+            padding-top: 15px;
         }
         
         .signature-section {
+            margin-top: 40px;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 40px;
-            margin-top: 50px;
+            gap: 30px;
         }
         
         .signature-box {
             text-align: center;
         }
         
-        .signature-box p {
-            font-weight: bold;
-            margin-bottom: 40px;
+        .signature-line {
+            border-top: 1px solid #000;
+            margin-top: 40px;
+            padding-top: 5px;
+            font-size: 10pt;
         }
         
-        .signature-line {
-            border-top: 2px solid #333;
-            margin-top: 10px;
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 80pt;
+            color: rgba(40, 167, 69, 0.1);
+            z-index: -1;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
+    <div class="watermark">OFFICIEL</div>
+    
     <div class="header">
-        <h1>📊 Relevé de Notes</h1>
-        <p>Session {{ date('Y') }} - Série {{ $serie->nom }}</p>
+        <h1>📊 RELEVÉ DE NOTES OFFICIEL</h1>
+        <p>{{ $session->name }}</p>
     </div>
 
-    <div class="info-candidat">
-        <h2>👤 Informations du Candidat</h2>
+    <div class="student-info">
+        <h2>Informations de l'Étudiant</h2>
         <div class="info-grid">
             <div class="info-item">
-                <strong>N° Table :</strong>
-                <span>{{ $candidat->numero_table }}</span>
+                <div class="info-label">Nom et Prénoms</div>
+                <div class="info-value">{{ $student->last_name }} {{ $student->first_name }}</div>
             </div>
             <div class="info-item">
-                <strong>Nom :</strong>
-                <span>{{ strtoupper($candidat->nom) }}</span>
+                <div class="info-label">Matricule</div>
+                <div class="info-value">{{ $student->matricule }}</div>
             </div>
             <div class="info-item">
-                <strong>Prénom :</strong>
-                <span>{{ ucfirst($candidat->prenom) }}</span>
+                <div class="info-label">Date de naissance</div>
+                <div class="info-value">{{ \Carbon\Carbon::parse($student->birth_date)->format('d/m/Y') }}</div>
             </div>
             <div class="info-item">
-                <strong>Date de naissance :</strong>
-                <span>{{ \Carbon\Carbon::parse($candidat->date_naissance)->format('d/m/Y') }}</span>
+                <div class="info-label">Classe</div>
+                <div class="info-value">{{ $student->class_level }}</div>
             </div>
             <div class="info-item">
-                <strong>École :</strong>
-                <span>{{ $ecole->nom }}</span>
+                <div class="info-label">Établissement</div>
+                <div class="info-value">{{ $student->school->name ?? 'N/A' }}</div>
             </div>
             <div class="info-item">
-                <strong>Série :</strong>
-                <span>{{ $serie->nom }}</span>
+                <div class="info-label">Session</div>
+                <div class="info-value">{{ $session->name }}</div>
             </div>
         </div>
     </div>
 
-    <table class="notes-table">
+    <h3 style="color: #28a745; margin: 25px 0 15px 0; font-size: 14pt;">📚 Détail des Notes</h3>
+    
+    <table class="grades-table">
         <thead>
             <tr>
-                <th style="width: 40%;">Matière</th>
-                <th class="text-center" style="width: 15%;">Note</th>
-                <th class="text-center" style="width: 15%;">Coefficient</th>
-                <th class="text-right" style="width: 20%;">Note x Coef</th>
-                <th class="text-center" style="width: 10%;">Appréciation</th>
+                <th>Matière</th>
+                <th class="text-center">Coefficient</th>
+                <th class="text-center">Note / 20</th>
+                <th class="text-center">Note Pondérée</th>
             </tr>
         </thead>
         <tbody>
             @php
-                $totalPoints = 0;
+                $totalWeighted = 0;
                 $totalCoef = 0;
             @endphp
             
-            @foreach($notes as $note)
+            @foreach($subjects as $subject)
                 @php
-                    $coef = $note->matiere->coefficient ?? 1;
-                    $noteCoef = $note->note * $coef;
-                    $totalPoints += $noteCoef;
+                    $note = $subject->pivot->note ?? 0;
+                    $coef = $subject->pivot->coefficient ?? 1;
+                    $weighted = $note * $coef;
+                    $totalWeighted += $weighted;
                     $totalCoef += $coef;
-                    
-                    // Appréciation
-                    if ($note->note >= 16) {
-                        $appreciation = 'TB';
-                    } elseif ($note->note >= 14) {
-                        $appreciation = 'B';
-                    } elseif ($note->note >= 12) {
-                        $appreciation = 'AB';
-                    } elseif ($note->note >= 10) {
-                        $appreciation = 'P';
-                    } else {
-                        $appreciation = 'I';
-                    }
                 @endphp
-                
                 <tr>
-                    <td>{{ $note->matiere->nom }}</td>
-                    <td class="text-center"><strong>{{ number_format($note->note, 2) }}</strong></td>
-                    <td class="text-center">{{ $coef }}</td>
-                    <td class="text-right">{{ number_format($noteCoef, 2) }}</td>
-                    <td class="text-center"><strong>{{ $appreciation }}</strong></td>
+                    <td>{{ $subject->name }}</td>
+                    <td class="text-center">{{ number_format($coef, 1) }}</td>
+                    <td class="text-center">{{ $note !== null ? number_format($note, 2) : 'N/A' }}</td>
+                    <td class="text-center">{{ number_format($weighted, 2) }}</td>
                 </tr>
             @endforeach
             
-            <tr style="background-color: #d5d8dc; font-weight: bold;">
+            <tr style="background-color: #f0f0f0; font-weight: bold;">
                 <td>TOTAL</td>
-                <td class="text-center">—</td>
-                <td class="text-center">{{ $totalCoef }}</td>
-                <td class="text-right">{{ number_format($totalPoints, 2) }}</td>
-                <td class="text-center">—</td>
+                <td class="text-center">{{ number_format($totalCoef, 1) }}</td>
+                <td class="text-center">-</td>
+                <td class="text-center">{{ number_format($totalWeighted, 2) }}</td>
             </tr>
         </tbody>
     </table>
 
-    <div class="resultat @if($moyenne >= 10) mention-{{ strtolower(str_replace(' ', '', $mention)) }} @else mention-aj @endif">
-        <h2>🏆 Résultat Final</h2>
-        <div class="moyenne">{{ number_format($moyenne, 2) }} / 20</div>
-        <div class="mention">{{ $mention }}</div>
-    </div>
-
-    <div style="background-color: #e8f5e9; padding: 12px; margin: 20px 0; border-left: 4px solid #27ae60;">
-        <p style="font-size: 10pt; margin: 0;">
-            <strong>Légende :</strong> TB = Très Bien (≥16) | B = Bien (≥14) | AB = Assez Bien (≥12) | P = Passable (≥10) | I = Insuffisant (<10)
-        </p>
+    <div class="summary-box">
+        <h3>🎯 Résultats de la Délibération</h3>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="summary-label">Moyenne Générale</div>
+                <div class="summary-value">{{ number_format($deliberation->average, 2) }}/20</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label">Décision du Jury</div>
+                <div class="summary-value 
+                    @if($deliberation->decision == 'Admis') decision-admis
+                    @elseif($deliberation->decision == 'Ajourné') decision-ajourne
+                    @else decision-exclu
+                    @endif">
+                    {{ $deliberation->decision }}
+                </div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label">Statut</div>
+                <div class="summary-value" style="font-size: 14pt;">
+                    @if($deliberation->is_validated)
+                        ✅ Validé
+                    @else
+                        ⏳ En attente
+                    @endif
+                </div>
+            </div>
+        </div>
+        
+        @if($deliberation->remarks)
+            <div style="margin-top: 15px; padding: 10px; background-color: white; border-radius: 5px;">
+                <strong>Observations :</strong> {{ $deliberation->remarks }}
+            </div>
+        @endif
     </div>
 
     <div class="signature-section">
         <div class="signature-box">
-            <p>Le Directeur de l'École</p>
-            <div class="signature-line"></div>
-            <p style="font-size: 9pt; color: #7f8c8d; margin-top: 5px;">Signature et cachet</p>
+            <p><strong>Le Président du Jury</strong></p>
+            <div class="signature-line">Signature et cachet</div>
         </div>
         <div class="signature-box">
-            <p>Le Président du Jury</p>
-            <div class="signature-line"></div>
-            <p style="font-size: 9pt; color: #7f8c8d; margin-top: 5px;">Signature et cachet</p>
+            <p><strong>Le Directeur de l'Établissement</strong></p>
+            <div class="signature-line">Signature et cachet</div>
         </div>
     </div>
 
     <div class="footer">
-        <p>Document généré le {{ $date_generation }}</p>
-        <p>Ce relevé de notes est officiel et certifié conforme</p>
+        <p><strong>Document généré le {{ $generated_at }}</strong></p>
+        <p>Ce relevé de notes est officiel et certifié conforme.</p>
+        <p>Toute falsification de ce document est passible de poursuites judiciaires.</p>
     </div>
 </body>
 </html>
