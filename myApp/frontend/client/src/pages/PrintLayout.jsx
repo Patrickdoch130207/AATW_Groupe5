@@ -1,33 +1,142 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { candidateService } from "../services/api";
+import { studentService, adminService } from "../services/api";
 
-const PrintLayout = ({ type }) => {
-    const { id } = useParams();
+const PrintLayout = ({ type, isAdmin = false }) => {
+    const { sessionId, studentId } = useParams();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (type === 'transcript') {
-            candidateService.getTranscript(id).then(res => setData(res.data)).finally(() => setLoading(false));
-        } else {
-            // Mock convocation call or real if exists. Assuming candidateService has it or similar.
-            // Actually I need to add getConvocation to service or reuse transcript endpoint if it has enough info?
-            // Let's assume we fetch standard candidate info + session info which is in transcript endpoint too.
-            candidateService.getTranscript(id).then(res => setData(res.data)).finally(() => setLoading(false));
-        }
-    }, [id, type]);
+        const fetchData = async () => {
+            try {
+                let res;
+                if (isAdmin) {
+                    // Pour admin, on a besoin de studentId et sessionId
+                    if (type === 'transcript') {
+                        res = await adminService.getStudentTranscriptDetails(studentId, sessionId);
+                    } else {
+                        res = await adminService.getStudentConvocationDetails(studentId, sessionId);
+                    }
+                } else {
+                    // Pour étudiant, on utilise sessionId
+                    if (type === 'transcript') {
+                        res = await studentService.getTranscriptDetails(sessionId);
+                    } else {
+                        // Convocation étudiant
+                        const convRes = await studentService.getMyConvocation(sessionId);
+                        // Normalisation pour le template qui attend 'candidate'
+                        if (convRes.success) {
+                            const student = convRes.data.student || convRes.data.candidate;
+                            const session = convRes.data.session;
+                            res = {
+                                success: true,
+                                data: {
+                                    candidate: {
+                                        ...student,
+                                        dob: student.birth_date,
+                                        session_name: session.name,
+                                        school_name: student.school?.name,
+                                        series_name: student.serie?.name || 'Générale',
+                                        table_number: student.table_number,
+                                        center_name: student.center_name
+                                    },
+                                    grades: [],
+                                    average: 0,
+                                    status: '',
+                                    mention: ''
+                                }
+                            };
+                        }
+                    }
+                }
+
+                if (res && res.success) {
+                    // Normalisation finale pour s'assurer que data.candidate existe
+                    if (res.data.student && !res.data.candidate) {
+                        const student = res.data.student;
+                        const session = res.data.session;
+                        res.data.candidate = {
+                            ...student,
+                            dob: student.birth_date,
+                            session_name: session.name,
+                            school_name: student.school?.name,
+                            series_name: student.serie?.name || 'Générale',
+                            table_number: student.table_number,
+                            center_name: student.center_name
+                        };
+                    }
+                    setData(res.data);
+                }
+            } catch (err) {
+                console.error("Erreur chargement document d'impression:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [sessionId, studentId, type, isAdmin]);
 
     useEffect(() => {
         if (!loading && data) {
-            setTimeout(() => window.print(), 500);
+            setTimeout(() => window.print(), 1000);
         }
     }, [loading, data]);
 
-    if (loading) return <div className="p-10 text-center">Chargement du document...</div>;
-    if (!data) return <div className="p-10 text-center text-red-500">Document introuvable.</div>;
+    const handleDownload = async () => {
+        try {
+            let blob;
+            if (isAdmin) {
+                blob = type === 'transcript'
+                    ? await adminService.downloadTranscript(studentId, sessionId)
+                    : await adminService.downloadConvocation(studentId, sessionId);
+            } else {
+                blob = type === 'transcript'
+                    ? await studentService.downloadTranscript(sessionId)
+                    : await studentService.downloadConvocation(sessionId);
+            }
 
-    const { candidate, grades, average, status, mention } = data;
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `${type}_${candidate.matricule}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (err) {
+            console.error("Erreur lors du téléchargement:", err);
+            alert("Erreur lors du téléchargement du PDF.");
+        }
+    };
+
+    if (loading) return <div className="p-10 text-center font-bold">Chargement du document de composition...</div>;
+    if (!data || !data.candidate) return <div className="p-10 text-center text-red-500 font-bold">Document introuvable ou vous n'avez pas l'autorisation d'y accéder.</div>;
+
+    const { candidate, grades = [], average = 0, status = '', mention = '' } = data;
+
+    const ActionButtons = () => (
+        <div className="fixed top-4 right-4 flex gap-4 z-50 print:hidden">
+            <button
+                onClick={handleDownload}
+                className="bg-[#ec8626] hover:bg-[#d47822] text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+                Télécharger PDF
+            </button>
+            <button
+                onClick={() => window.print()}
+                className="bg-slate-900 hover:bg-black text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" />
+                </svg>
+                Imprimer
+            </button>
+        </div>
+    );
 
     const StatusBadge = ({ status }) => {
         let colors = "bg-slate-100 text-slate-500";
@@ -54,6 +163,7 @@ const PrintLayout = ({ type }) => {
     if (type === 'convocation') {
         return (
             <div className="max-w-[21cm] mx-auto bg-white p-12 min-h-[29.7cm] text-slate-900 font-['Poppins'] relative overflow-hidden border-[16px] border-double border-slate-100 print:border-none">
+                <ActionButtons />
                 <Watermark />
 
                 <div className="relative z-10">
@@ -161,6 +271,7 @@ const PrintLayout = ({ type }) => {
     // Transcript View (Relevé de Notes)
     return (
         <div className="max-w-[21cm] mx-auto bg-white p-12 min-h-[29.7cm] text-slate-900 font-['Poppins'] relative overflow-hidden print:p-8">
+            <ActionButtons />
             <Watermark />
 
             <div className="relative z-10">

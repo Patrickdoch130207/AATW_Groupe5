@@ -228,7 +228,7 @@
             </div>
             <div class="info-item">
                 <div class="info-label">Établissement</div>
-                <div class="info-value">{{ $student->school->name ?? 'N/A' }}</div>
+                <div class="info-value">{{ $student->school->school_name ?? 'N/A' }}</div>
             </div>
             <div class="info-item">
                 <div class="info-label">Session</div>

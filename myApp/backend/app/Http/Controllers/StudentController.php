@@ -13,30 +13,28 @@ class StudentController extends Controller
 {
     public function store(Request $request)
     {
+        // Log de débug pour voir ce que le backend reçoit réellement
+        \Illuminate\Support\Facades\Log::info('Inscription étudiant - Request Data:', $request->all());
+        \Illuminate\Support\Facades\Log::info('Inscription étudiant - Files:', $request->allFiles());
+
         $request->validate([
             'first_name' => 'required|string|max:100',
             'last_name' => 'required|string|max:100',
             'birth_date' => 'required|date', 
-            'pob' => 'required|string|max:255', // Lieu de naissance (Frontend)
+            'pob' => 'required|string|max:255',
             'series' => [
-                'string',
                 'nullable',
+                'sometimes',
+                'string',
                 'in:A1,A2,A3,B,C,D,E,F1,F2,F3,F4,G1,G2,G3',
                 'required_if:class_level,Tle'
-                ], // Série (Frontend)
-            'gender' => 'required|in:M,F', // Genre (Frontend)
-            'class_level'=>'required|in:3e,Tle', // 
-            'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048', // Photo (Frontend)
+            ],
+            'gender' => 'required|in:M,F',
+            'class_level' => 'required|in:3e,Tle', 
+            'photo' => 'nullable|sometimes|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
         $userSchool = $request->user();
-
-        if ($request->hasFile('photo')) {
-    // Stocke la photo dans storage/app/public/students
-            $path = $request->file('photo')->store('students', 'public');
-            $student->photo = $path;
-            $student->save();
-        }
         
         if ($userSchool->role !== 'school') {
             return response()->json(['message' => 'Action non autorisée'], 403);
@@ -54,7 +52,6 @@ class StudentController extends Controller
 
             //Génération de l'email personnalisé
             $cleanLastName = strtolower(Str::slug($request->last_name));
-
             $email = $cleanLastName . "." . $matricule . "@examflow.com";
             
             // 3. GÉNÉRATION DU MOT DE PASSE (10 caractères aléatoires)
@@ -62,6 +59,8 @@ class StudentController extends Controller
 
             // 4. Création de l'utilisateur
             $user = User::create([
+                'name' => $request->first_name . ' ' . $request->last_name,
+                'username' => strtolower($request->first_name) . '.' . strtolower($request->last_name),
                 'email' => $email,
                 'password' => Hash::make($autoPassword),
                 'role' => 'student',
@@ -77,10 +76,16 @@ class StudentController extends Controller
                 'birth_date' => $request->birth_date,
                 'class_level' => $request->class_level,
                 'pob'         => $request->pob,
-                'class_level' => $request->class_level,
                 'series'      => $request->series,
                 'temp_password' => $autoPassword,
             ]);
+
+            if ($request->hasFile('photo')) {
+                // Stocke la photo dans storage/app/public/students
+                $path = $request->file('photo')->store('students', 'public');
+                $student->photo = $path;
+                $student->save();
+            }
 
             DB::commit();
 
@@ -103,13 +108,10 @@ class StudentController extends Controller
         }
     }
 
-
     public function show(Request $request, $id)
     {
         $school = $request->user()->school;
 
-        // On cherche l'étudiant par son ID ET par le school_id pour éviter qu'une école 
-        // puisse voir l'élève d'une autre école en devinant son ID.
         $student = Student::where('id', $id)
                       ->where('school_id', $school->id)
                       ->with('user:id,email')
@@ -119,54 +121,46 @@ class StudentController extends Controller
             return response()->json([
                 'message' => "Étudiant introuvable ou vous n'avez pas l'autorisation de le voir."
             ], 404);
-     }
+        }
 
         return response()->json($student);
     }
 
     public function index(Request $request)
-{
-    // 1. Récupérer l'école liée à l'utilisateur (Admin École) connecté
-    $school = $request->user()->school;
+    {
+        $school = $request->user()->school;
 
-    if (!$school) {
-        return response()->json(['message' => 'Profil établissement non trouvé.'], 404);
+        if (!$school) {
+            return response()->json(['message' => 'Profil établissement non trouvé.'], 404);
+        }
+
+        $students = Student::where('school_id', $school->id)
+                        ->with('user:id,email')
+                        ->latest()
+                        ->get();
+
+        return response()->json([
+            'total' => $students->count(),
+            'students' => $students
+        ]);
     }
 
-    // 2. Récupérer les étudiants uniquement pour cette école
-    $students = Student::where('school_id', $school->id)
-                    ->with('user:id,email') // Charge l'email du compte login
-                    ->latest()
-                    ->get();
+    public function getStats(Request $request)
+    {
+        $user = $request->user();
+        $school = $user->school;
 
-    // 3. Retourner les données (on les enveloppe dans 'students' pour le front)
-    return response()->json([
-        'total' => $students->count(),
-        'students' => $students
-    ]);
-}
+        if (!$school) {
+            return response()->json(['count' => 0], 200);
+        }
 
-public function getStats(Request $request)
-{
-    $user = $request->user();
-    
-    // On récupère l'école via la relation définie dans le modèle User
-    $school = $user->school;
+        $count = Student::where('school_id', $school->id)->count();
 
-    if (!$school) {
-        return response()->json(['count' => 0], 200);
+        return response()->json([
+            'count' => $count
+        ]);
     }
 
-    // Compter le nombre d'étudiants ayant le school_id de cette école
-    $count = Student::where('school_id', $school->id)->count();
-
-    return response()->json([
-        'count' => $count
-    ]);
-}
-    /**
-     * Récupère les résultats (délibérations) de l'étudiant connecté
-     */
     public function getMyResults(Request $request)
     {
         $user = $request->user();
@@ -177,7 +171,6 @@ public function getStats(Request $request)
 
         $student = $user->student;
         
-        // Récupérer toutes les délibérations de l'étudiant avec les sessions et les notes
         $deliberations = \App\Models\Deliberation::where('student_id', $student->id)
             ->with([
                 'examSession:id,name,start_date,end_date,status',
@@ -192,6 +185,8 @@ public function getStats(Request $request)
         return response()->json([
             'success' => true,
             'data' => $deliberations->map(function ($del) use ($student) {
+                $isValidated = (bool) $del->is_validated;
+                
                 return [
                     'id' => $del->id,
                     'session' => $del->examSession ? [
@@ -201,67 +196,107 @@ public function getStats(Request $request)
                         'end_date' => $del->examSession->end_date,
                         'status' => $del->examSession->status,
                     ] : null,
-                    'average' => $del->average,
-                    'decision' => $del->decision,
-                    'is_validated' => $del->is_validated,
-                    'remarks' => $del->remarks,
-                    'subjects' => $student->subjects->map(function ($subject) {
+                    'average' => $isValidated ? $del->average : null,
+                    'decision' => $isValidated ? $del->decision : 'En attente',
+                    'is_validated' => $isValidated,
+                    'remarks' => $isValidated ? $del->remarks : null,
+                    'subjects' => $isValidated ? $student->subjects->map(function ($subject) {
                         return [
                             'id' => $subject->id,
                             'name' => $subject->name,
                             'coef' => (float) ($subject->pivot->coefficient ?? 1.0),
                             'note' => $subject->pivot->note !== null ? (float) $subject->pivot->note : null,
                         ];
-                    }),
+                    }) : [],
                 ];
             }),
         ]);
     }
 
-    /**
-     * Récupère la convocation de l'étudiant pour une session
-     */
-    public function getMyConvocation(Request $request, $sessionId)
+    public function getMyConvocation($sessionId)
     {
-        $user = $request->user();
-        
-        if ($user->role !== 'student' || !$user->student) {
-            return response()->json(['message' => 'Accès non autorisé'], 403);
+        $user = auth()->user();
+        if (!$user->student) {
+            return response()->json(['message' => 'Étudiant non trouvé'], 404);
         }
 
-        $student = $user->student;
-        
-        // Vérifier que l'étudiant est bien inscrit à cette session
-        if ($student->exam_session_id != $sessionId) {
-            return response()->json(['message' => 'Vous n\'êtes pas inscrit à cette session'], 404);
+        $student = $user->student->load(['school', 'serie']);
+        $session = \App\Models\ExamSession::findOrFail($sessionId);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'student' => $student,
+                'session' => $session
+            ]
+        ]);
+    }
+
+    public function getTranscriptDetails($sessionId)
+    {
+        $user = auth()->user();
+        if (!$user->student) {
+            return response()->json(['message' => 'Étudiant non trouvé'], 404);
         }
 
         $session = \App\Models\ExamSession::findOrFail($sessionId);
         
+        // Déterminer les matières de la session
+        $sessionSubjectIds = [];
+        if ($session->subjects_config && isset($session->subjects_config['subjects'])) {
+            $sessionSubjectIds = array_filter(array_map(fn($s) => $s['subject_id'] ?? null, $session->subjects_config['subjects']));
+        }
+
+        $student = $user->student->load(['school', 'subjects' => function ($query) use ($sessionSubjectIds) {
+            $query->withPivot('note', 'coefficient');
+            if (!empty($sessionSubjectIds)) {
+                $query->whereIn('subjects.id', $sessionSubjectIds);
+            }
+        }]);
+        
+        $deliberation = \App\Models\Deliberation::where('student_id', $student->id)
+            ->where('exam_session_id', $sessionId)
+            ->with('grades')
+            ->first();
+
+        if (!$deliberation || !$deliberation->is_validated) {
+            return response()->json(['message' => 'Le relevé n\'est pas encore disponible'], 403);
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
-                'student' => [
+                'candidate' => [
                     'id' => $student->id,
                     'first_name' => $student->first_name,
                     'last_name' => $student->last_name,
                     'matricule' => $student->matricule,
-                    'birth_date' => $student->birth_date,
-                    'class_level' => $student->class_level,
-                    'school' => $student->school ? [
-                        'id' => $student->school->id,
-                        'name' => $student->school->name,
-                        'establishment_code' => $student->school->establishment_code,
-                    ] : null,
+                    'dob' => $student->birth_date ? ($student->birth_date instanceof \DateTime ? $student->birth_date->format('Y-m-d') : $student->birth_date) : null,
+                    'pob' => $student->pob ?? '---',
+                    'school_name' => $student->school ? $student->school->name : '---',
+                    'series_name' => $student->serie ? $student->serie->name : 'Générale',
+                    'session_name' => $session->name,
                 ],
-                'session' => [
-                    'id' => $session->id,
-                    'name' => $session->name,
-                    'start_date' => $session->start_date,
-                    'end_date' => $session->end_date,
-                    'status' => $session->status,
-                ],
-            ],
+                'grades' => $deliberation->grades->map(function ($grade) {
+                    return [
+                        'subject_name' => $grade->subject_name,
+                        'score' => $grade->grade,
+                        'coefficient' => $grade->coefficient,
+                    ];
+                }),
+                'average' => $deliberation->average,
+                'status' => strtoupper($deliberation->decision),
+                'mention' => $this->calculateMention($deliberation->average),
+            ]
         ]);
+    }
+
+    private function calculateMention($average)
+    {
+        if ($average >= 16) return 'TRÈS BIEN';
+        if ($average >= 14) return 'BIEN';
+        if ($average >= 12) return 'ASSEZ BIEN';
+        if ($average >= 10) return 'PASSABLE';
+        return '---';
     }
 }

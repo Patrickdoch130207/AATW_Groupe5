@@ -73,8 +73,7 @@ class DeliberationController extends Controller
 
         $student = Student::with([
             'subjects' => function ($query) {
-                $query->select('subjects.id', 'name')
-                      ->withPivot('note', 'coefficient');
+                $query->withPivot('note', 'coefficient');
             },
             'school'
         ])->findOrFail($validated['student_id']);
@@ -87,10 +86,14 @@ class DeliberationController extends Controller
         }
 
         $syncData = [];
-        foreach ($validated['grades'] as $grade) {
+        foreach ($validated['grades'] as $index => $grade) {
             $subjectId = $grade['subject_id'];
-            $note = array_key_exists('note', $grade) && $grade['note'] !== ''
-                ? round((float) $grade['note'], 2)
+            
+            // Supporter à la fois 'note' (attendu) et 'score' (envoyé par certains clients)
+            $rawNote = $grade['note'] ?? $request->input("grades.$index.score");
+            
+            $note = ($rawNote !== null && $rawNote !== '')
+                ? round((float) $rawNote, 2)
                 : null;
             $coef = isset($grade['coef']) ? (float) $grade['coef'] : 1.0;
 
@@ -109,8 +112,7 @@ class DeliberationController extends Controller
 
         $student->subjects()->syncWithoutDetaching($syncData);
         $student->load(['subjects' => function ($query) {
-            $query->select('subjects.id', 'name')
-                  ->withPivot('note', 'coefficient');
+            $query->withPivot('note', 'coefficient');
         }]);
 
         // NE PAS calculer la moyenne lors de l'enregistrement
@@ -141,8 +143,8 @@ class DeliberationController extends Controller
                     'class_level' => $student->class_level,
                     'school' => $student->school ? [
                         'id' => $student->school->id,
-                        'name' => $student->school->name,
-                        'establishment_code' => $student->school->establishment_code,
+                        'school_name' => $student->school->school_name,
+                        'decree_number' => $student->school->decree_number,
                     ] : null,
                     'subjects' => $student->subjects->map(function ($subject) {
                         return [
@@ -241,11 +243,19 @@ class DeliberationController extends Controller
      */
     public function calculateForSession(ExamSession $examSession)
     {
-        // Récupérer uniquement les étudiants de cette session
+        // 1. Déterminer les IDs des matières configurées
+        $sessionSubjectIds = [];
+        if ($examSession->subjects_config && isset($examSession->subjects_config['subjects'])) {
+            $sessionSubjectIds = array_filter(array_map(fn($s) => $s['subject_id'] ?? null, $examSession->subjects_config['subjects']));
+        }
+
+        // 2. Récupérer les étudiants avec uniquement les matières de la session
         $students = Student::where('exam_session_id', $examSession->id)
-            ->with(['subjects' => function ($query) {
-                $query->select('subjects.id', 'name')
-                      ->withPivot('note', 'coefficient');
+            ->with(['subjects' => function ($query) use ($sessionSubjectIds) {
+                $query->withPivot('note', 'coefficient');
+                if (!empty($sessionSubjectIds)) {
+                    $query->whereIn('subjects.id', $sessionSubjectIds);
+                }
             }])
             ->get();
 
@@ -268,10 +278,13 @@ class DeliberationController extends Controller
             $average = $this->calculateAverageFromSubjects($student->subjects);
             $decision = $this->determineDecisionFromAverage($average, $student->subjects);
 
+            // Si la moyenne est null (pas de notes), utiliser 0 pour éviter l'erreur de contrainte
+            $averageValue = $average !== null ? $average : 0;
+
             if ($existingDeliberation) {
                 // Mettre à jour la délibération existante
                 $existingDeliberation->update([
-                    'average' => $average,
+                    'average' => $averageValue,
                     'decision' => $decision,
                     'is_validated' => false, // Reste non validée
                 ]);
@@ -281,7 +294,7 @@ class DeliberationController extends Controller
                 Deliberation::create([
                     'exam_session_id' => $examSession->id,
                     'student_id' => $student->id,
-                    'average' => $average,
+                    'average' => $averageValue,
                     'decision' => $decision,
                     'is_validated' => false,
                 ]);
@@ -344,6 +357,30 @@ class DeliberationController extends Controller
 
         foreach ($deliberations as $deliberation) {
             if (!$deliberation->is_validated) {
+                // Snapshot grades to Grade table before validation
+                $student = Student::with(['subjects' => function ($query) use ($examSession) {
+                    $query->withPivot('note', 'coefficient');
+                    // Filter by session subjects
+                    if ($examSession->subjects_config && isset($examSession->subjects_config['subjects'])) {
+                        $sessionSubjectIds = array_filter(array_map(fn($s) => $s['subject_id'] ?? null, $examSession->subjects_config['subjects']));
+                        if (!empty($sessionSubjectIds)) {
+                            $query->whereIn('subjects.id', $sessionSubjectIds);
+                        }
+                    }
+                }])->find($deliberation->student_id);
+
+                if ($student) {
+                    foreach ($student->subjects as $subject) {
+                        \App\Models\Grade::create([
+                            'deliberation_id' => $deliberation->id,
+                            'subject_id' => $subject->id,
+                            'subject_name' => $subject->name,
+                            'grade' => $subject->pivot->note,
+                            'coefficient' => $subject->pivot->coefficient ?? 1.0,
+                        ]);
+                    }
+                }
+
                 $deliberation->update([
                     'is_validated' => true,
                 ]);
@@ -369,30 +406,32 @@ class DeliberationController extends Controller
     /**
      * Calcule la moyenne pondérée depuis les matières de l'étudiant
      */
-    private function calculateAverageFromSubjects($subjects): float
+    private function calculateAverageFromSubjects($subjects): ?float
     {
         $totalWeighted = 0;
         $totalCoefficients = 0;
+        $hasValidNotes = false;
 
         foreach ($subjects as $subject) {
             $note = $subject->pivot->note;
             $coefficient = $subject->pivot->coefficient ?? 1.0;
 
             if ($note !== null && is_numeric($note) && $note >= 0 && $note <= 20) {
-                $totalWeighted += $note * $coefficient;
-                $totalCoefficients += $coefficient;
+                $totalWeighted += (float)$note * (float)$coefficient;
+                $totalCoefficients += (float)$coefficient;
+                $hasValidNotes = true;
             }
         }
 
-        return $totalCoefficients > 0 ? round($totalWeighted / $totalCoefficients, 2) : 0.0;
+        return $hasValidNotes && $totalCoefficients > 0 ? round($totalWeighted / $totalCoefficients, 2) : null;
     }
 
     /**
      * Détermine la décision selon la moyenne et les notes
      */
-    private function determineDecisionFromAverage(float $average, $subjects): string
+    private function determineDecisionFromAverage(?float $average, $subjects): string
     {
-        if ($average === 0.0) {
+        if ($average === null) {
             return 'Non noté';
         }
 
@@ -410,13 +449,13 @@ class DeliberationController extends Controller
             return 'Notes manquantes';
         }
 
-        // Règles de décision
+        // Règles de décision (Admis: 10+, Ajourné: 8-10, Refusé: <8)
         if ($average >= 10) {
             return 'Admis';
         } elseif ($average >= 8) {
             return 'Ajourné';
         } else {
-            return 'Exclu';
+            return 'Refusé';
         }
     }
 }

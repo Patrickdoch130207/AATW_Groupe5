@@ -3,8 +3,12 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use App\Models\School; // Import du modèle School indispensable
+use App\Models\ExamSession;
+use App\Models\Student;
+use App\Models\Deliberation;
 
 class AdminController extends Controller
 {
@@ -46,10 +50,9 @@ class AdminController extends Controller
         ]);
     }
 
+    // 4. Récupérer les écoles actives
     public function getActiveSchools()
     {
-        // On récupère les établissements dont le statut est "active"
-        // avec les informations de l'utilisateur associé (email, etc.)
         $activeSchools = School::where('status', 'active')
                                 ->with('user')
                                 ->get();
@@ -57,22 +60,208 @@ class AdminController extends Controller
         return response()->json($activeSchools);
     }
 
+    // 4b. Récupérer les écoles rejetées/inactives
+    public function getRejectedSchools()
+    {
+        $rejectedSchools = School::where('status', 'rejected')
+                                    ->with('user')
+                                    ->get();
+
+        return response()->json($rejectedSchools);
+    }
+
+    // 5. Mettre à jour le statut d'une école
+    public function updateSchoolStatus($id, Request $request)
+    {
+        $school = School::findOrFail($id);
+        
+        $request->validate([
+            'status' => 'required|in:pending,active,rejected'
+        ]);
+
+        $school->status = $request->status;
+        $school->save();
+
+        return response()->json([
+            'message' => 'Statut mis à jour avec succès',
+            'school' => $school
+        ]);
+    }
+
+    // 6. Mettre à jour les informations d'une école
+    public function updateSchool($id, Request $request)
+    {
+        $school = School::findOrFail($id);
+        
+        // Mise à jour des champs autorisés
+        $school->fill($request->only([
+            'name', 'address', 'city', 'phone', 
+            'director_name', 'decree_number', 'is_center'
+        ]));
+        
+        $school->save();
+
+        return response()->json([
+            'message' => 'École mise à jour avec succès',
+            'school' => $school
+        ]);
+    }
+
+    // Compatibilité avec l'ancienne route /admin/stats
     public function getStats()
-{
-    // On compte uniquement les écoles validées pour le premier badge
-    $activeSchools = \App\Models\School::where('status', 'active')->count();
-    
-    // On compte tous les candidats inscrits dans la table students
-    $totalCandidates = \App\Models\Student::count();
+    {
+        return $this->getDashboardStats();
+    }
 
-    // On peut aussi compter les sessions si vous avez une table dédiée
-    $activeSessions = 1; 
+    /**
+     * Récupère les statistiques pour le tableau de bord administrateur
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getDashboardStats()
+    {
+        try {
+            // Récupérer la session active
+            $activeSession = ExamSession::where('status', 'open')->first();
+            
+            $stats = [
+                'schools_count' => School::where('status', 'active')->count(),
+                'candidates_count' => Student::count(),
+                'active_session_count' => ExamSession::where('status', 'open')->count(),
+                'active_session_name' => $activeSession ? $activeSession->name : "Pas de session active",
+                'pending_deliberations' => Deliberation::where('is_validated', false)->count(),
+            ];
 
-    return response()->json([
-        'schools_count' => $activeSchools,
-        'candidates_count' => $totalCandidates,
-        'active_session_count' => $activeSessions,
-        'active_session_name' => "Session Décembre 2025"
-    ]);
-}
+            return response()->json($stats);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération des statistiques',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Retourne les classes disponibles par école pour l'ouverture des sessions.
+     */
+    public function getClassGroups()
+    {
+        $classes = Student::select('school_id', 'class_level', 'series', DB::raw('COUNT(*) as students_count'))
+            ->whereNotNull('class_level')
+            ->where(function($q) {
+                $q->whereNull('exam_session_id')
+                  ->orWhereHas('examSession', function($sq) {
+                      $sq->where('status', '!=', 'open');
+                  });
+            })
+            ->with('school:id,school_name')
+            ->groupBy('school_id', 'class_level', 'series')
+            ->orderBy('class_level')
+            ->orderBy('school_id')
+            ->get()
+            ->map(function ($item) {
+                $series = $item->series ?: null;
+                $schoolName = optional($item->school)->school_name ?? 'Établissement';
+
+                return [
+                    'id' => implode('|', [$item->school_id, $item->class_level, $series ?? '']),
+                    'school_id' => $item->school_id,
+                    'school_name' => $schoolName,
+                    'class_level' => $item->class_level,
+                    'series' => $series,
+                    'students_count' => (int) $item->students_count,
+                    'label' => sprintf(
+                        'Classe de %s – %s%s',
+                        strtoupper($item->class_level),
+                        $schoolName,
+                        $series ? " – Série {$series}" : ''
+                    ),
+                ];
+            })
+            ->values();
+
+        return response()->json($classes);
+    }
+
+    /**
+     * Récupère les détails complets d'un étudiant pour l'impression de la convocation (pour admin)
+     */
+    public function getStudentConvocationDetails($studentId, $sessionId)
+    {
+        $student = Student::with(['school', 'serie'])->findOrFail($studentId);
+        $session = ExamSession::findOrFail($sessionId);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'student' => $student,
+                'session' => $session
+            ]
+        ]);
+    }
+
+    public function getStudentTranscriptDetails($studentId, $sessionId)
+    {
+        $session = ExamSession::findOrFail($sessionId);
+        
+        // Déterminer les matières de la session
+        $sessionSubjectIds = [];
+        if ($session->subjects_config && isset($session->subjects_config['subjects'])) {
+            $sessionSubjectIds = array_filter(array_map(fn($s) => $s['subject_id'] ?? null, $session->subjects_config['subjects']));
+        }
+
+        $student = Student::with(['school', 'subjects' => function ($query) use ($sessionSubjectIds) {
+            $query->withPivot('note', 'coefficient');
+            if (!empty($sessionSubjectIds)) {
+                $query->whereIn('subjects.id', $sessionSubjectIds);
+            }
+        }])->findOrFail($studentId);
+        
+        $deliberation = Deliberation::where('student_id', $studentId)
+            ->where('exam_session_id', $sessionId)
+            ->with('grades')
+            ->first();
+
+        if (!$deliberation || !$deliberation->is_validated) {
+            return response()->json(['message' => 'Le relevé n\'est pas encore disponible'], 403);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'candidate' => [
+                    'id' => $student->id,
+                    'first_name' => $student->first_name,
+                    'last_name' => $student->last_name,
+                    'matricule' => $student->matricule,
+                    'dob' => $student->birth_date ? ($student->birth_date instanceof \DateTime ? $student->birth_date->format('Y-m-d') : $student->birth_date) : null,
+                    'pob' => $student->pob ?? '---',
+                    'school_name' => $student->school ? $student->school->school_name : '---',
+                    'series_name' => $student->serie ? $student->serie->name : 'Générale',
+                    'session_name' => $session->name,
+                ],
+                'grades' => $deliberation->grades->map(function ($grade) {
+                    return [
+                        'subject_name' => $grade->subject_name,
+                        'score' => $grade->grade,
+                        'coefficient' => $grade->coefficient,
+                    ];
+                }),
+                'average' => $deliberation->average,
+                'status' => strtoupper($deliberation->decision),
+                'mention' => $this->calculateMention($deliberation->average),
+            ]
+        ]);
+    }
+
+    private function calculateMention($average)
+    {
+        if ($average >= 16) return 'TRÈS BIEN';
+        if ($average >= 14) return 'BIEN';
+        if ($average >= 12) return 'ASSEZ BIEN';
+        if ($average >= 10) return 'PASSABLE';
+        return '---';
+    }
 }

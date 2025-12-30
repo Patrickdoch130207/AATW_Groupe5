@@ -7,7 +7,6 @@ const RegisterEcole = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  // 1. Initialisation avec département vide pour forcer le choix
   const [formData, setFormData] = useState({
     nom_etablissement: '',
     nom_directeur: '',
@@ -28,8 +27,6 @@ const RegisterEcole = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    // Si on change de département, on réinitialise la ville pour la cohérence
     if (name === "departement") {
       setFormData({ ...formData, [name]: value, ville: '' });
     } else {
@@ -59,7 +56,7 @@ const RegisterEcole = () => {
       };
 
       const response = await authService.registerSchool(payload);
-      if (response.data.success) {
+      if (response.data?.success || response.success) {
         alert("Demande d'agrément envoyée avec succès !");
         navigate('/login');
       }
@@ -74,8 +71,6 @@ const RegisterEcole = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-6 font-sans">
       <div className="w-full max-w-4xl bg-white rounded-[40px] shadow-2xl p-12 border border-gray-100">
-
-        {/* Header */}
         <div className="flex items-center gap-6 mb-12 border-b border-gray-50 pb-8">
           <div className="w-16 h-16 bg-[#1d6d1f] rounded-2xl flex items-center justify-center shadow-xl shadow-green-100 rotate-3">
             <Landmark className="text-white w-9 h-9" />
@@ -93,8 +88,6 @@ const RegisterEcole = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
-
-          {/* --- SECTION 1 : IDENTITÉ --- */}
           <div className="md:col-span-2 flex items-center gap-3 text-[#1579de] font-bold text-sm uppercase tracking-[0.2em] mb-2">
             <div className="h-[2px] w-8 bg-[#1579de]"></div>
             Informations Générales
@@ -126,7 +119,6 @@ const RegisterEcole = () => {
             </div>
           </div>
 
-          {/* --- SECTION 2 : AUTORISATION --- */}
           <div className="md:col-span-2 flex items-center gap-3 text-[#ec8626] font-bold text-sm uppercase tracking-[0.2em] mt-6 mb-2">
             <div className="h-[2px] w-8 bg-[#ec8626]"></div>
             Cadre Légal
@@ -145,7 +137,6 @@ const RegisterEcole = () => {
             </div>
           </div>
 
-          {/* --- SECTION 3 : LOCALISATION --- */}
           <div className="md:col-span-2 flex items-center gap-3 text-[#1d6d1f] font-bold text-sm uppercase tracking-[0.2em] mt-6 mb-2">
             <div className="h-[2px] w-8 bg-[#1d6d1f]"></div>
             Localisation Géographique
@@ -190,7 +181,6 @@ const RegisterEcole = () => {
             </div>
           </div>
 
-          {/* --- SECTION: COMPTE --- */}
           <div className="md:col-span-2 flex items-center gap-3 text-slate-700 font-bold text-sm uppercase tracking-[0.2em] mt-6 mb-2">
             <div className="h-[2px] w-8 bg-slate-700"></div>
             Identifiants de Connexion
@@ -233,7 +223,6 @@ const RegisterEcole = () => {
             </div>
           </div>
 
-          {/* --- BOUTON D'ENVOI --- */}
           <div className="md:col-span-2 mt-10">
             <button
               type="submit"
@@ -245,6 +234,13 @@ const RegisterEcole = () => {
               ) : (
                 <> Soumettre le dossier d'inscription <ArrowRight className="w-6 h-6" /> </>
               )}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              className="w-full mt-4 py-3 text-gray-500 font-bold hover:text-blue-600 transition-colors"
+            >
+              Déjà un compte ? Se connecter
             </button>
             <p className="text-center text-gray-400 text-[11px] mt-6 leading-relaxed">
               En cliquant sur "Soumettre", vous engagez la responsabilité juridique de l'établissement.<br />

@@ -12,7 +12,7 @@ const MesCandidats = () => {
       candidateService
         .getBySchool(user.id)
         .then((res) => {
-          const data = res.data.students || res.data;
+          const data = res.data?.students || res.data;
           setCandidats(Array.isArray(data) ? data : []);
         })
         .catch((err) =>
@@ -22,15 +22,17 @@ const MesCandidats = () => {
   }, [user]);
 
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    alert("Copié !");
+    if (!text) return;
+    navigator.clipboard.writeText(String(text));
+    alert('Copié !');
   };
 
-  const filteredCandidats = candidats.filter(
-    (c) =>
-      c.last_name.toLowerCase().includes(search.toLowerCase()) ||
-      c.first_name.toLowerCase().includes(search.toLowerCase()) ||
-      c.matricule.toString().includes(search)
+  const filteredCandidats = candidats.filter((c) =>
+    [
+      c?.last_name?.toLowerCase(),
+      c?.first_name?.toLowerCase(),
+      c?.matricule ? String(c.matricule).toLowerCase() : '',
+    ].some((v) => v?.includes(search.toLowerCase()))
   );
 
   return (
@@ -82,36 +84,37 @@ const MesCandidats = () => {
                 <td className="p-6">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-100">
-                      {c.first_name[0]}
-                      {c.last_name[0]}
+                      {c?.first_name?.[0] || 'C'}
+                      {c?.last_name?.[0] || 'D'}
                     </div>
                     <div>
                       <p className="font-bold text-slate-800 uppercase">
                         {c.last_name} {c.first_name}
                       </p>
                       <p className="text-xs text-slate-400 font-medium italic">
-                        Matricule: {c.matricule}
+                        Matricule: {c.matricule || '—'}
                       </p>
                     </div>
                   </div>
                 </td>
+
                 <td className="p-6">
                   <span className="px-3 py-1 bg-slate-100 rounded-full text-xs font-black text-slate-600 mr-2">
-                    {c.class_level}
+                    {c.class_level || 'N/A'}
                   </span>
                   <span className="text-sm font-bold text-blue-600">
-                    {c.class_level === "3ème" ? "Brevet" : c.series}
+                    {c.series || c.series_name || (c.class_level === "3e" ? "Brevet" : "Sans Série")}
                   </span>
                 </td>
+
                 <td className="p-6">
                   <div className="space-y-2">
-                    {/* Email / Login */}
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-2 bg-blue-50/50 px-3 py-1.5 rounded-lg border border-blue-100 w-full justify-between">
                         <div className="flex items-center gap-2 truncate">
                           <Mail size={14} className="text-blue-500" />
                           <span className="font-mono text-xs font-bold text-blue-700 truncate">
-                            {c.user?.email}
+                            {c.user?.email || '—'}
                           </span>
                         </div>
                         <button
@@ -122,13 +125,13 @@ const MesCandidats = () => {
                         </button>
                       </div>
                     </div>
-                    {/* Password */}
+
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-2 bg-orange-50/50 px-3 py-1.5 rounded-lg border border-orange-100 w-full justify-between">
                         <div className="flex items-center gap-2">
                           <Key size={14} className="text-orange-500" />
                           <span className="font-mono text-xs font-bold text-orange-700">
-                            {c.temp_password || "******"}
+                            {c.temp_password || '******'}
                           </span>
                         </div>
                         <button
@@ -141,18 +144,35 @@ const MesCandidats = () => {
                     </div>
                   </div>
                 </td>
+
                 <td className="p-6 text-right">
                   <div className="flex justify-end gap-2">
-                    <button className="p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                    <button
+                      onClick={() => window.open(`/print/transcript/${c.id}`, '_blank')}
+                      className="p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                      title="Télécharger Relevé de Notes"
+                    >
                       <FileText size={18} />
                     </button>
-                    <button className="p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-green-600 hover:text-white transition-all shadow-sm">
+                    <button
+                      onClick={() => window.open(`/print/convocation/${c.id}`, '_blank')}
+                      className="p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-green-600 hover:text-white transition-all shadow-sm"
+                      title="Télécharger Convocation"
+                    >
                       <Download size={18} />
                     </button>
                   </div>
                 </td>
               </tr>
             ))}
+
+            {filteredCandidats.length === 0 && (
+              <tr>
+                <td colSpan="4" className="p-6 text-center text-slate-500">
+                  Aucun candidat trouvé.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

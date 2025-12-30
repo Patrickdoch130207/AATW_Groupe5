@@ -3,7 +3,6 @@ import {
   UserPlus,
   Image as ImageIcon,
   Save,
-  GraduationCap,
 } from "lucide-react";
 import {
   candidateService,
@@ -53,10 +52,9 @@ const InscriptionCandidats = () => {
     const user = authService.getCurrentUser();
 
     try {
-      // Use FormData for file upload
       const data = new FormData();
       Object.keys(formData).forEach((key) => data.append(key, formData[key]));
-      data.append("school_user_id", user.id);
+      // school_user_id is handled in backend from auth, but we can send it for consistency if needed
       if (photoFile) {
         data.append("photo", photoFile);
       }
@@ -67,7 +65,7 @@ const InscriptionCandidats = () => {
     } catch (err) {
       alert(
         "Erreur lors de l'inscription: " +
-          (err.response?.data?.message || err.message)
+        (err.response?.data?.message || err.message)
       );
     } finally {
       setLoading(false);
@@ -76,7 +74,6 @@ const InscriptionCandidats = () => {
 
   return (
     <div className="max-w-5xl mx-auto py-10 px-4">
-      {/* En-tête de la carte */}
       <div className="bg-gradient-to-r from-[#1579de] to-[#2ecc71] rounded-t-[40px] p-10 text-white relative overflow-hidden shadow-2xl shadow-blue-200">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
         <div className="flex items-center gap-6 relative z-10">
@@ -94,13 +91,11 @@ const InscriptionCandidats = () => {
         </div>
       </div>
 
-      {/* Corps du formulaire */}
       <div className="bg-white rounded-b-[40px] shadow-2xl shadow-slate-200 border-x border-b border-white p-10 md:p-14 -mt-6 pt-16 relative z-0">
         <form
           onSubmit={handleSubmit}
           className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8"
         >
-          {/* Section Identité Visuelle */}
           <div className="col-span-1 md:col-span-2 flex flex-col items-center justify-center mb-8">
             <div
               className="relative group cursor-pointer"
@@ -187,7 +182,6 @@ const InscriptionCandidats = () => {
             </div>
           </div>
 
-          {/* Sélecteur de Classe */}
           <div className="space-y-3">
             <label className="text-xs font-black text-slate-400 uppercase ml-2 tracking-widest">
               Classe
@@ -204,7 +198,6 @@ const InscriptionCandidats = () => {
             </select>
           </div>
 
-          {/* Sélecteur de Série - Affiché conditionnellement */}
           {["Tle"].includes(formData.class_level) && (
             <div className="space-y-3 animate-in fade-in duration-500">
               <label className="text-xs font-black text-slate-400 uppercase ml-2 tracking-widest">
@@ -220,15 +213,17 @@ const InscriptionCandidats = () => {
                 <optgroup label="Enseignement Général">
                   <option value="A1">A1</option>
                   <option value="A2">A2</option>
+                  <option value="A3">A3</option>
                   <option value="B">B</option>
                   <option value="C">C</option>
                   <option value="D">D</option>
                 </optgroup>
-                <optgroup label="Technique & G2">
-                  <option value="G1">F1</option>
-                  <option value="G1">F2</option>
-                  <option value="G1">F3</option>
-                  <option value="G1">F4</option>
+                <optgroup label="Technique & Professionnel">
+                  <option value="E">E</option>
+                  <option value="F1">F1</option>
+                  <option value="F2">F2</option>
+                  <option value="F3">F3</option>
+                  <option value="F4">F4</option>
                   <option value="G1">G1</option>
                   <option value="G2">G2</option>
                   <option value="G3">G3</option>
@@ -270,7 +265,7 @@ const InscriptionCandidats = () => {
               className="w-full py-6 bg-gradient-to-r from-[#1d6d1f] to-[#27ae60] text-white rounded-[24px] font-black text-xl uppercase tracking-widest shadow-xl shadow-green-100 hover:shadow-2xl hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-4 group"
             >
               <div className="bg-white/20 p-2 rounded-xl group-hover:rotate-12 transition-transform">
-                <Save size={24} />
+                <UserPlus size={24} />
               </div>
               {loading ? "Enregistrement..." : "Valider l'inscription"}
             </button>

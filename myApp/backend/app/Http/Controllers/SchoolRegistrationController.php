@@ -34,10 +34,11 @@ class SchoolRegistrationController extends Controller
     try {
         // 2. Création du User (identifiants)
         $user = User::create([
+            'name'     => $request->school_name,
+            'username' => \Illuminate\Support\Str::slug($request->school_name) . '.' . time(),
             'email'    => $request->email,
             'password' => Hash::make($request->password),
             'role'     => 'school',
-            
         ]);
 
         // 3. Création du Profil School

@@ -17,22 +17,10 @@ const Layout = ({ userRole }) => {
   const user = authService.getCurrentUser();
   const menuItems = {
     admin: [
-      {
-        label: "Tableau de bord",
-        path: "/admin/dashboard",
-        icon: <LayoutDashboard />,
-      },
-      {
-        label: "Sessions Exams",
-        path: "/admin/sessions",
-        icon: <ClipboardList />,
-      },
-      {
-        label: "Validation Écoles",
-        path: "/admin/validation",
-        icon: <CheckSquare />,
-      },
-      { label: "Délibération", path: "/admin/deliberations", icon: <Edit2 /> },
+      { label: 'Tableau de bord', path: '/admin/dashboard', icon: <LayoutDashboard /> },
+      { label: 'Sessions Exams', path: '/admin/sessions', icon: <ClipboardList /> },
+      { label: 'Validation Écoles', path: '/admin/validation', icon: <CheckSquare /> },
+      { label: 'Délibération', path: '/admin/deliberations', icon: <Edit2 /> },
     ],
     school: [
       { label: "Tableau de bord", path: "/ecole/dashboard", icon: <School /> },
@@ -50,7 +38,6 @@ const Layout = ({ userRole }) => {
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-slate-200 flex flex-col">
         <div className="p-6">
           <Link to="/" className="flex items-center gap-2">
@@ -73,7 +60,9 @@ const Layout = ({ userRole }) => {
               to={item.path}
               className="flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-blue-50 hover:text-[#1579de] rounded-xl transition-all font-medium"
             >
-              {item.icon}
+              <div className="w-5 h-5 flex items-center justify-center">
+                {item.icon}
+              </div>
               {item.label}
             </Link>
           ))}
@@ -81,56 +70,54 @@ const Layout = ({ userRole }) => {
 
         <div className="p-4 border-t border-slate-100">
           <button
-            onClick={() => navigate("/login")}
+            onClick={() => {
+              authService.logout();
+              navigate("/login");
+            }}
             className="flex items-center gap-3 w-full px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl transition-all font-bold"
           >
-            <LogOut /> Déconnexion
+            <LogOut size={20} /> Déconnexion
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-end px-8">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-end px-8 sticky top-0 z-50">
           <div className="flex items-center gap-3">
             <div className="text-right">
               <p className="text-xs font-black text-slate-800 uppercase tracking-tight">
-                {/* Pour l'école */}
-                {user?.role === "school" && user?.school?.school_name}
-
-                {/* Pour l'étudiant - Maintenant que le PHP envoie l'objet 'student' */}
-                {user?.role === "student" &&
-                  `${user?.student?.first_name} ${user?.student?.last_name}`}
-
-                {/* Pour l'admin */}
+                {user?.role === "school" && (user?.school?.name || user?.school?.school_name)}
+                {(user?.role === "student" || user?.role === "etudiant") &&
+                  `${user?.student?.first_name || user?.first_name} ${user?.student?.last_name || user?.last_name}`}
                 {user?.role === "admin" && user?.email}
               </p>
 
               <p className="text-[10px] text-slate-400 font-bold uppercase">
                 {user?.role === "school"
                   ? "Espace École"
-                  : user?.role === "student"
-                  ? `Matricule: ${user?.student?.matricule}`
-                  : "Administration"}
+                  : (user?.role === "student" || user?.role === "etudiant")
+                    ? `Matricule: ${user?.student?.matricule || user?.matricule}`
+                    : "Administration"}
               </p>
             </div>
 
-            <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-[#1579de] border border-blue-100 shadow-sm">
-              {user?.role === "admin" ? (
+            <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-[#1579de] border border-blue-100 shadow-sm overflow-hidden">
+              {user?.photo ? (
+                <img src={user.photo} alt="Avatar" className="w-full h-full object-cover" />
+              ) : user?.role === "admin" ? (
                 <User size={20} />
               ) : (
                 <span className="font-black text-sm uppercase">
-                  {/* Initiale dynamique selon le rôle */}
-                  {user?.role === "school"
-                    ? user?.school?.school_name?.[0]
-                    : user?.student?.first_name?.[0]}
+                  {(user?.role === "school"
+                    ? (user?.school?.name || user?.school?.school_name)?.[0]
+                    : (user?.student?.first_name || user?.first_name)?.[0]) || 'U'}
                 </span>
               )}
             </div>
           </div>
         </header>
         <div className="p-8">
-          <Outlet /> {/* C'est ici que les pages s'affichent */}
+          <Outlet />
         </div>
       </main>
     </div>

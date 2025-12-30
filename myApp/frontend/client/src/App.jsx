@@ -56,8 +56,10 @@ function App() {
         <Route path="/register-ecole" element={<RegisterEcole />} />
 
         {/* Routes d'Impression */}
-        <Route path="/print/transcript/:id" element={<PrintLayout type="transcript" />} />
-        <Route path="/print/convocation/:id" element={<PrintLayout type="convocation" />} />
+        <Route path="/print/transcript/:sessionId" element={<PrintLayout type="transcript" />} />
+        <Route path="/print/convocation/:sessionId" element={<PrintLayout type="convocation" />} />
+        <Route path="/print/admin/transcript/:studentId/:sessionId" element={<PrintLayout type="transcript" isAdmin />} />
+        <Route path="/print/admin/convocation/:studentId/:sessionId" element={<PrintLayout type="convocation" isAdmin />} />
 
         {/* ==========================================================
             ROUTES PRIVÉES (Nécessitent d'être connecté)

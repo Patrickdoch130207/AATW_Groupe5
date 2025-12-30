@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, FileText, Download, Calendar, MapPin, Clock } from 'lucide-react';
+import { FileText, Download, Clock } from 'lucide-react';
 import { authService, studentService } from '../../services/api';
 
 const CandidatDashboard = () => {
@@ -30,7 +30,6 @@ const CandidatDashboard = () => {
         </div>
     );
 
-    // Si pas de résultats, afficher un message d'accueil simple
     if (!result) return (
         <div className="max-w-6xl mx-auto p-6 md:p-10">
             <div className="bg-white rounded-[40px] p-10 shadow-sm border border-slate-100 text-center">
@@ -44,8 +43,7 @@ const CandidatDashboard = () => {
         </div>
     );
 
-    // Adaptation des données pour l'affichage
-    const candidate = user; // Utilise les infos de l'utilisateur connecté
+    const candidate = user;
     const status = result.decision;
     const average = result.average;
     const mention = average >= 16 ? 'TRÈS BIEN' : average >= 14 ? 'BIEN' : average >= 12 ? 'ASSEZ BIEN' : average >= 10 ? 'PASSABLE' : '---';
@@ -65,17 +63,13 @@ const CandidatDashboard = () => {
 
     return (
         <div className="max-w-6xl mx-auto p-6 md:p-10">
-            {/* Header Profile */}
             <div className="bg-white rounded-[40px] p-8 shadow-sm border border-slate-100 flex flex-col md:flex-row items-center gap-10 mb-10 overflow-hidden relative">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 opacity-50"></div>
-
                 <div className="w-40 h-40 bg-slate-50 rounded-[40px] flex items-center justify-center shadow-inner overflow-hidden border-4 border-white shadow-slate-200/50">
                     <span className="text-5xl font-black text-slate-300 uppercase letter-spacing-widest">
                         {candidate.first_name?.[0]}{candidate.last_name?.[0]}
                     </span>
                 </div>
-
-
                 <div className="text-center md:text-left flex-1 relative z-10">
                     <div className="flex flex-col md:flex-row md:items-center gap-4 mb-4">
                         <h1 className="text-4xl font-black text-slate-800 uppercase tracking-tighter">
@@ -85,7 +79,6 @@ const CandidatDashboard = () => {
                             {getStatusLabel(status)}
                         </span>
                     </div>
-
                     <div className="flex flex-wrap justify-center md:justify-start gap-4 text-xs font-black text-slate-400 uppercase tracking-widest">
                         <span className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
                             Matricule: <span className="text-slate-800">{candidate.matricule || '---'}</span>
@@ -97,7 +90,6 @@ const CandidatDashboard = () => {
                 </div>
             </div>
 
-            {/* Results Table Section */}
             <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden mb-10">
                 <div className="p-8 border-b border-slate-50 bg-slate-50/30">
                     <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-4">
@@ -107,7 +99,6 @@ const CandidatDashboard = () => {
                         Récapitulatif de l'Examen
                     </h2>
                 </div>
-
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
@@ -142,7 +133,6 @@ const CandidatDashboard = () => {
             </div>
 
             <div className="grid md:grid-cols-2 gap-8">
-                {/* Documents Card */}
                 <div className="bg-white rounded-[40px] p-8 shadow-sm border border-slate-100">
                     <h2 className="text-xl font-black text-slate-800 mb-8 flex items-center gap-4">
                         <div className="w-10 h-10 bg-slate-900 text-white rounded-xl shadow-lg flex items-center justify-center">
@@ -150,25 +140,9 @@ const CandidatDashboard = () => {
                         </div>
                         Mes Documents Officiels
                     </h2>
-
                     <div className="space-y-4">
-                        {/* Convocation Button */}
                         <button
-                            onClick={async () => {
-                                try {
-                                    const blob = await studentService.downloadConvocation(result.session?.id);
-                                    const url = window.URL.createObjectURL(blob);
-                                    const link = document.createElement('a');
-                                    link.href = url;
-                                    link.setAttribute('download', `convocation_${candidate.matricule}.pdf`);
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    link.remove();
-                                } catch (e) {
-                                    console.error("Erreur téléchargement convocation", e);
-                                    alert("Erreur lors du téléchargement de la convocation.");
-                                }
-                            }}
+                            onClick={() => window.open(`/print/convocation/${result.session?.id}`, '_blank')}
                             className="w-full p-6 flex items-center justify-between bg-slate-50 hover:bg-slate-100 rounded-[24px] group transition-all border border-transparent hover:border-blue-100"
                         >
                             <div className="flex items-center gap-6">
@@ -182,25 +156,9 @@ const CandidatDashboard = () => {
                             </div>
                             <ChevronRight size={20} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
                         </button>
-
-                        {/* Relevé Button */}
                         <button
                             disabled={!result.is_validated}
-                            onClick={async () => {
-                                try {
-                                    const blob = await studentService.downloadTranscript(result.session?.id);
-                                    const url = window.URL.createObjectURL(blob);
-                                    const link = document.createElement('a');
-                                    link.href = url;
-                                    link.setAttribute('download', `releve_notes_${candidate.matricule}.pdf`);
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    link.remove();
-                                } catch (e) {
-                                    console.error("Erreur téléchargement relevé", e);
-                                    alert("Erreur lors du téléchargement du relevé de notes.");
-                                }
-                            }}
+                            onClick={() => window.open(`/print/transcript/${result.session?.id}`, '_blank')}
                             className={`w-full p-6 flex items-center justify-between rounded-[24px] group transition-all border ${!result.is_validated ? 'bg-slate-50/50 opacity-50 cursor-not-allowed' : 'bg-slate-50 hover:bg-slate-100 border-transparent hover:border-green-100'}`}
                         >
                             <div className="flex items-center gap-6">
@@ -216,8 +174,6 @@ const CandidatDashboard = () => {
                         </button>
                     </div>
                 </div>
-
-                {/* Info Card */}
                 <div className="bg-gradient-to-br from-[#1579de] to-[#0d47a1] rounded-[40px] p-10 text-white shadow-2xl shadow-blue-200 relative overflow-hidden">
                     <div className="absolute bottom-0 right-0 w-64 h-64 bg-white/10 rounded-full -mb-32 -mr-32 blur-3xl"></div>
                     <h2 className="text-xl font-black uppercase mb-8 relative z-10">À savoir</h2>

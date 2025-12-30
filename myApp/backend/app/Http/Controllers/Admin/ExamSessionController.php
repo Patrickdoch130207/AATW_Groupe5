@@ -50,17 +50,6 @@ class ExamSessionController extends Controller
 
     public function store(Request $request)
     {
-        file_put_contents('/home/stj/AATW_Groupe5/.cursor/debug.log', json_encode([
-            'id' => 'log_' . time() . '_1',
-            'timestamp' => time() * 1000,
-            'location' => 'ExamSessionController.php:51',
-            'message' => 'store called',
-            'data' => ['request_data' => $request->all()],
-            'sessionId' => 'debug-session',
-            'runId' => 'run2',
-            'hypothesisId' => 'C'
-        ]) . "\n", FILE_APPEND);
-
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'start_date' => 'required|date|after_or_equal:today',
@@ -131,7 +120,12 @@ class ExamSessionController extends Controller
                 ];
             });
 
-        $query = Student::whereNull('exam_session_id');
+        $query = Student::where(function($q) {
+            $q->whereNull('exam_session_id')
+              ->orWhereHas('examSession', function($sq) {
+                  $sq->where('status', '!=', 'open');
+              });
+        });
 
         $query->where(function ($q) use ($criteria) {
             foreach ($criteria as $group) {
@@ -148,9 +142,39 @@ class ExamSessionController extends Controller
 
         $students = $query->get();
 
+        // Auto-assign table numbers with format: SESSION-YEAR-XXX
+        // Example: BEPC-2025-001, BEPC-2025-002, etc.
+        
+        // Extract session name prefix (remove spaces and special chars)
+        $sessionPrefix = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $session->name));
+        
+        // Get current year
+        $year = date('Y');
+        
+        // Start sequential numbering from 1
+        $sequentialNumber = 1;
+        
         foreach ($students as $student) {
+            // Generate table number: PREFIX-YEAR-3-digit sequential number
+            $tableNumber = $sessionPrefix . '-' . $year . '-' . str_pad($sequentialNumber, 3, '0', STR_PAD_LEFT);
+            
             $student->exam_session_id = $session->id;
+            $student->table_number = $tableNumber;
             $student->save();
+            
+            $sequentialNumber++;
+
+            // Reset notes for subjects in the new session
+            $sessionSubjectIds = [];
+            if ($session->subjects_config && isset($session->subjects_config['subjects'])) {
+                $sessionSubjectIds = array_filter(array_map(fn($s) => $s['subject_id'] ?? null, $session->subjects_config['subjects']));
+            }
+
+            if (!empty($sessionSubjectIds)) {
+                foreach ($sessionSubjectIds as $subjectId) {
+                    $student->subjects()->updateExistingPivot($subjectId, ['note' => null]);
+                }
+            }
         }
     }
 
@@ -183,14 +207,14 @@ class ExamSessionController extends Controller
     private function ensureSessionSubjects(Student $student, $subjects, $coefficientsMap): void
     {
         $existingIds = $student->subjects->pluck('id')->all();
-        $studentSerieCode = $student->serie->code ?? 'ALL'; // Par défaut 'ALL' si pas de série
+        $studentSerieCode = $student->serie?->code ?? 'ALL'; // Par défaut 'ALL' si pas de série
         
         $attachData = [];
         foreach ($subjects as $subjectId => $subject) {
             // $subjectId est la clé (l'ID) et $subject est l'objet Subject
             
             // Si la matière existe déjà, mettre à jour le coefficient si nécessaire
-            if (in_array($subjectId, $existingIds, true)) {
+            if (in_array($subjectId, $existingIds)) {
                 // Mettre à jour le coefficient selon la filière
                 if (isset($coefficientsMap[$subjectId])) {
                     $coeff = $coefficientsMap[$subjectId][$studentSerieCode] 
@@ -218,16 +242,13 @@ class ExamSessionController extends Controller
             ];
         }
 
-        // Détacher les matières qui ne sont pas dans la session
-        $sessionSubjectIds = $subjects->keys()->all();
-        $student->subjects()->whereNotIn('subjects.id', $sessionSubjectIds)->detach();
+        // On ne détache plus les matières pour éviter de perdre les notes d'autres sessions
+        // La filtration se fera au niveau de l'affichage (réponse API)
 
         // Attacher les nouvelles matières
         if (!empty($attachData)) {
             $student->subjects()->attach($attachData);
         }
-        
-        $student->load('subjects');
     }
 
     public function open($examSession)
@@ -248,15 +269,24 @@ class ExamSessionController extends Controller
     public function getSessionStudents($id)
     {
         try {
-            // Chargement des relations nécessaires de manière optimisée
+            // 1. Déterminer les IDs des matières configurées
+            $sessionSubjectIds = [];
+            $tempSession = ExamSession::find($id);
+            if ($tempSession && $tempSession->subjects_config && isset($tempSession->subjects_config['subjects'])) {
+                $sessionSubjectIds = array_filter(array_map(fn($s) => $s['subject_id'] ?? null, $tempSession->subjects_config['subjects']));
+            }
+
+            // 2. Chargement des relations filtrées
             $session = ExamSession::with([
-                'students' => function($query) {
+                'students' => function($query) use ($sessionSubjectIds) {
                     $query->with([
                         'school',
                         'serie',
-                        'subjects' => function($query) {
-                            $query->select('subjects.id', 'name')
-                                  ->withPivot('note', 'coefficient');
+                        'subjects' => function($query) use ($sessionSubjectIds) {
+                            $query->withPivot('note', 'coefficient');
+                            if (!empty($sessionSubjectIds)) {
+                                $query->whereIn('subjects.id', $sessionSubjectIds);
+                            }
                         }
                     ]);
                 }
@@ -299,14 +329,12 @@ class ExamSessionController extends Controller
                 });
             }
             
-            $finalSessionSubjectIds = $sessionSubjectIds; // Pour utiliser dans la closure
-            $students = $session->students->map(function($student) use ($finalSessionSubjectIds) {
-                // Filtrer les matières pour ne garder que celles de la session
+            $students = $session->students->map(function($student) use ($sessionSubjectIds) {
+                // Filtrer manuellement car ensureSessionSubjects a pu modifier la collection chargée
                 $studentSubjects = $student->subjects;
-                
-                if (!empty($finalSessionSubjectIds)) {
-                    $studentSubjects = $studentSubjects->filter(function($subject) use ($finalSessionSubjectIds) {
-                        return in_array($subject->id, $finalSessionSubjectIds);
+                if (!empty($sessionSubjectIds)) {
+                    $studentSubjects = $studentSubjects->filter(function($subj) use ($sessionSubjectIds) {
+                        return in_array($subj->id, $sessionSubjectIds);
                     });
                 }
                 
@@ -323,8 +351,8 @@ class ExamSessionController extends Controller
                     ] : null,
                     'school' => $student->school ? [
                         'id' => $student->school->id,
-                        'name' => $student->school->name,
-                        'establishment_code' => $student->school->establishment_code
+                        'name' => $student->school->name ?? $student->school->school_name,
+                        'decree_number' => $student->school->decree_number
                     ] : null,
                     'subjects' => $studentSubjects->map(function($subject) {
                         return [
@@ -338,8 +366,8 @@ class ExamSessionController extends Controller
                                         $subject->pivot->note <= 20
                         ];
                     })->values(),
-                    'average' => $this->calculateStudentAverage($student),
-                    'decision' => $this->determineDecision($student)
+                    'average' => $this->calculateStudentAverage($student, $sessionSubjectIds),
+                    'decision' => $this->determineDecision($student, $sessionSubjectIds)
                 ];
             });
 
@@ -373,13 +401,18 @@ class ExamSessionController extends Controller
      * @param  \App\Models\Student  $student
      * @return float|null
      */
-    private function calculateStudentAverage($student)
+    private function calculateStudentAverage($student, $sessionSubjectIds = [])
     {
         $total = 0;
         $totalCoefficients = 0;
         $hasValidNotes = false;
 
-        foreach ($student->subjects as $subject) {
+        $subjects = $student->subjects;
+        if (!empty($sessionSubjectIds)) {
+            $subjects = $subjects->filter(fn($s) => in_array($s->id, $sessionSubjectIds));
+        }
+
+        foreach ($subjects as $subject) {
             $note = $subject->pivot->note;
             $coefficient = $subject->pivot->coefficient ?? 1.0;
             
@@ -397,11 +430,12 @@ class ExamSessionController extends Controller
      * Détermine la décision de délibération pour un étudiant
      *
      * @param  \App\Models\Student  $student
+     * @param  array  $sessionSubjectIds
      * @return string
      */
-    private function determineDecision($student)
+    private function determineDecision($student, $sessionSubjectIds = [])
     {
-        $average = $this->calculateStudentAverage($student);
+        $average = $this->calculateStudentAverage($student, $sessionSubjectIds);
         
         if ($average === null) {
             return 'Non noté';
@@ -417,13 +451,13 @@ class ExamSessionController extends Controller
             return 'Notes manquantes';
         }
         
-        // Règles de décision (à adapter selon vos besoins)
+        // Règles de décision (Admis: 10+, Ajourné: 8-10, Refusé: <8)
         if ($average >= 10) {
             return 'Admis';
-        } elseif ($average >= 7) {
+        } elseif ($average >= 8) {
             return 'Ajourné';
         } else {
-            return 'Exclu';
+            return 'Refusé';
         }
     }
     

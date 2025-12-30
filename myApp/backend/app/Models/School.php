@@ -13,7 +13,7 @@ class School extends Model
 
     protected $fillable = [
         'user_id', 'school_name', 'director_name', 'decree_number', 
-    'department', 'city', 'address', 'status'
+        'department', 'city', 'address', 'status', 'phone', 'contact_email', 'justification_path'
     ];
 
     // Lien vers le compte utilisateur (Authentification)
